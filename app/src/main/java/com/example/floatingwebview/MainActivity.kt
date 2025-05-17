@@ -23,11 +23,7 @@ class MainActivity : AppCompatActivity() {
             if (Settings.canDrawOverlays(this)) {
                 startFloatingWebView()
             } else {
-                val intent = Intent(
-                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:$packageName")
-                )
-                startActivityForResult(intent, OVERLAY_PERMISSION_REQUEST_CODE)
+                requestOverlayPermission()
             }
         }
     }
@@ -50,19 +46,27 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startFloatingWebView() {
-        val intent = Intent(this, FloatingWebViewService::class.java)
-        intent.putExtra("url", binding.urlEditText.text.toString())
+        try {
+            val intent = Intent(this, FloatingWebViewService::class.java)
+                .apply {
+                putExtra("url", binding.urlEditText.text.toString())
+                putExtra("size", when (binding.sizeRadioGroup.checkedRadioButtonId) {
+                    R.id.smallSize -> "small"
+                    R.id.mediumSize -> "medium"
+                    R.id.largeSize -> "large"
+                    else -> "medium"
+                })
+            }
 
-        val size = when (binding.sizeRadioGroup.checkedRadioButtonId) {
-            R.id.smallSize -> "small"
-            R.id.mediumSize -> "medium"
-            R.id.largeSize -> "large"
-            else -> "medium"
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent)
+            } else {
+                startService(intent)
+            }
+        } catch (e: Exception) {
+            Toast.makeText(this, "Error starting web view: ${e.message}",
+                Toast.LENGTH_SHORT).show()
         }
-        intent.putExtra("size", size)
-
-        startService(intent)
-        finish()
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
