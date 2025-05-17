@@ -32,11 +32,13 @@ class FloatingWebViewService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        showFloatingWebView(intent?.getStringExtra("url") ?: "https://www.google.com")
+        val url = intent?.getStringExtra("url") ?: "https://www.google.com"
+        val size = intent?.getStringExtra("size") ?: "medium"
+        showFloatingWebView(url, size)
         return START_NOT_STICKY
     }
 
-    private fun showFloatingWebView(url: String) {
+    private fun showFloatingWebView(url: String, size: String = "medium") {
 //        val themedContext = ContextThemeWrapper(applicationContext,
 //            android.R.style.Theme_DeviceDefault_Light)
         val inflater = getSystemService(LAYOUT_INFLATER_SERVICE) as LayoutInflater
@@ -44,8 +46,24 @@ class FloatingWebViewService : Service() {
         floatingWebView = binding.root
 
         val displayMetrics = resources.displayMetrics
-        val width = (displayMetrics.widthPixels * 0.8).toInt()
-        val height = (displayMetrics.heightPixels * 0.6).toInt()
+        val (width, height) = when (size) {
+            "small" -> Pair(
+                (displayMetrics.widthPixels * 0.5).toInt(),
+                (displayMetrics.heightPixels * 0.4).toInt()
+            )
+            "medium" -> Pair(
+                (displayMetrics.widthPixels * 0.7).toInt(),
+                (displayMetrics.heightPixels * 0.6).toInt()
+            )
+            "large" -> Pair(
+                (displayMetrics.widthPixels * 0.9).toInt(),
+                (displayMetrics.heightPixels * 0.8).toInt()
+            )
+            else -> Pair(
+                (displayMetrics.widthPixels * 0.7).toInt(),
+                (displayMetrics.heightPixels * 0.6).toInt()
+            )
+        }
 
         val params = WindowManager.LayoutParams(
             width, height,

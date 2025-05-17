@@ -52,6 +52,15 @@ class MainActivity : AppCompatActivity() {
     private fun startFloatingWebView() {
         val intent = Intent(this, FloatingWebViewService::class.java)
         intent.putExtra("url", binding.urlEditText.text.toString())
+
+        val size = when (binding.sizeRadioGroup.checkedRadioButtonId) {
+            R.id.smallSize -> "small"
+            R.id.mediumSize -> "medium"
+            R.id.largeSize -> "large"
+            else -> "medium"
+        }
+        intent.putExtra("size", size)
+
         startService(intent)
         finish()
     }
