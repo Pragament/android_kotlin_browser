@@ -18,12 +18,13 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ImageButton
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.PopupMenu
+import android.widget.TextView
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.example.floatingwebview.databinding.FloatingWebViewLayoutBinding
 // ... (package and imports remain unchanged)
-
 class FloatingWebViewService : Service() {
     private val windowManager by lazy { getSystemService(WINDOW_SERVICE) as WindowManager }
     private val activeWindows = mutableMapOf<Int, Pair<View, WindowManager.LayoutParams>>()
@@ -31,6 +32,9 @@ class FloatingWebViewService : Service() {
 
     private val CHANNEL_ID = "FloatingWebViewChannel"
     private val NOTIFICATION_ID = 101
+
+    // Global toggle flag
+    private var isJavaScriptEnabled = true
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -49,7 +53,6 @@ class FloatingWebViewService : Service() {
             ).apply {
                 description = "Channel for Floating WebView service"
             }
-
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)
         }
@@ -111,6 +114,7 @@ class FloatingWebViewService : Service() {
         setupDragListener(binding.headerView, windowId)
         setupMoreOptionsButton(binding.moreOptionsButton, binding.webView)
         setupResizeListener(binding.resizeHandle, rootView, params)
+        setupJsToggle(binding.jsToggle, binding.jsStatusIcon, binding.webView)
 
         try {
             windowManager.addView(rootView, params)
@@ -123,7 +127,7 @@ class FloatingWebViewService : Service() {
     private fun setupWebView(webView: WebView, url: String, rootView: View, params: WindowManager.LayoutParams) {
         WebView.setWebContentsDebuggingEnabled(true)
         webView.settings.apply {
-            javaScriptEnabled = true
+            javaScriptEnabled = isJavaScriptEnabled
             domStorageEnabled = true
             loadWithOverviewMode = true
             useWideViewPort = true
@@ -135,16 +139,13 @@ class FloatingWebViewService : Service() {
         webView.webViewClient = WebViewClient()
         webView.loadUrl(url)
 
-        // Detect when user touches input to focus
         webView.setOnTouchListener { v, event ->
             if (event.action == MotionEvent.ACTION_DOWN || event.action == MotionEvent.ACTION_UP) {
-                // Temporarily make view focusable to allow keyboard
                 if (params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE != 0) {
                     params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
                     windowManager.updateViewLayout(rootView, params)
                     webView.requestFocus()
 
-                    // Show keyboard
                     val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
                     imm.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0)
                 }
@@ -159,7 +160,6 @@ class FloatingWebViewService : Service() {
         }
     }
 
-    @SuppressLint("ClickableViewAccessibility")
     private fun setupDragListener(headerView: View, windowId: Int) {
         headerView.setOnTouchListener { view, event ->
             val windowPair = activeWindows[windowId] ?: return@setOnTouchListener false
@@ -187,20 +187,16 @@ class FloatingWebViewService : Service() {
             val popup = PopupMenu(this, moreButton)
             popup.menuInflater.inflate(R.menu.webview_options_menu, popup.menu)
 
-            // Get window and params
             val parentView = moreButton.rootView
             val windowId = activeWindows.entries.find { it.value.first == parentView }?.key
             val params = activeWindows[windowId]?.second
 
-            // Remove NOT_FOCUSABLE flag temporarily
             params?.let {
                 it.flags = it.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
                 windowManager.updateViewLayout(parentView, it)
             }
 
             popup.setOnMenuItemClickListener { item ->
-                val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-
                 when (item.itemId) {
                     R.id.go_back -> {
                         if (webView.canGoBack()) webView.goBack()
@@ -224,7 +220,6 @@ class FloatingWebViewService : Service() {
                 }
             }
 
-            // Restore NOT_FOCUSABLE flag after popup is dismissed
             popup.setOnDismissListener {
                 params?.let {
                     it.flags = it.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
@@ -236,8 +231,6 @@ class FloatingWebViewService : Service() {
         }
     }
 
-
-    @SuppressLint("ClickableViewAccessibility")
     private fun setupResizeListener(resizeHandle: ImageView, rootView: View, params: WindowManager.LayoutParams) {
         resizeHandle.setOnTouchListener(object : View.OnTouchListener {
             private var initialWidth = 0
@@ -268,6 +261,21 @@ class FloatingWebViewService : Service() {
         })
     }
 
+    private fun setupJsToggle(jsToggle: LinearLayout, jsStatusIcon: TextView, webView: WebView) {
+        jsToggle.setOnClickListener {
+            isJavaScriptEnabled = !isJavaScriptEnabled
+            webView.settings.javaScriptEnabled = isJavaScriptEnabled
+            webView.reload()
+            jsStatusIcon.text = if (isJavaScriptEnabled) "🟢" else "🔴"
+
+            Toast.makeText(
+                this,
+                "JavaScript ${if (isJavaScriptEnabled) "Enabled" else "Disabled"}",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
     private fun removeWindow(windowId: Int) {
         try {
             activeWindows[windowId]?.let { (view, _) ->
@@ -275,10 +283,7 @@ class FloatingWebViewService : Service() {
                 (view.findViewById<WebView>(R.id.webView))?.destroy()
                 activeWindows.remove(windowId)
             }
-
-            if (activeWindows.isEmpty()) {
-                stopSelf()
-            }
+            if (activeWindows.isEmpty()) stopSelf()
         } catch (_: Exception) {}
     }
 
