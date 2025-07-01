@@ -1,34 +1,51 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/floatingLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/white" >
+    android:background="@android:color/white">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical" >
+        android:orientation="vertical">
 
+        <!-- Header View with Close and More Options -->
         <RelativeLayout
             android:id="@+id/headerView"
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:background="#6200EE">
 
+            <!-- More Options Button -->
+            <ImageButton
+                android:id="@+id/moreOptionsButton"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:layout_alignParentStart="true"
+                android:layout_centerVertical="true"
+                android:layout_marginStart="12dp"
+                android:background="?android:selectableItemBackgroundBorderless"
+                android:src="@android:drawable/ic_menu_sort_by_size"
+                app:tint="@android:color/white"
+                android:contentDescription="More Options" />
+
+            <!-- Close Button -->
             <ImageButton
                 android:id="@+id/closeButton"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
                 android:layout_alignParentEnd="true"
                 android:layout_centerVertical="true"
                 android:layout_marginEnd="12dp"
                 android:background="?android:selectableItemBackgroundBorderless"
                 android:src="@android:drawable/ic_menu_close_clear_cancel"
-                app:tint="@android:color/white" />
-
+                app:tint="@android:color/white"
+                android:contentDescription="Close" />
         </RelativeLayout>
 
+        <!-- WebView Area -->
         <WebView
             android:id="@+id/webView"
             android:layout_width="match_parent"
@@ -36,4 +53,19 @@
             android:layout_weight="1"
             android:background="@android:color/white" />
     </LinearLayout>
+
+    <!-- Resize Handle in Bottom-Right -->
+    <ImageView
+        android:id="@+id/resizeHandle"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="6dp"
+        android:src="@drawable/ic_resizer"
+        android:background="?android:selectableItemBackgroundBorderless"
+        android:contentDescription="Resize"
+        android:alpha="0.5" />
+
+
+
 </FrameLayout>

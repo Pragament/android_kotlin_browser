@@ -1,0 +1,23 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/go_back"
+        android:title="Go back"
+        android:icon="@drawable/ic_back" />
+
+    <item
+        android:id="@+id/go_forward"
+        android:title="Go forward"
+        android:icon="@drawable/ic_forward" />
+
+    <item
+        android:id="@+id/reload"
+        android:title="Reload"
+        android:icon="@drawable/ic_reload" />
+
+    <item
+        android:id="@+id/new_tab"
+        android:title="New tab"
+        android:icon="@drawable/ic_new_tab" />
+
+
+</menu>
