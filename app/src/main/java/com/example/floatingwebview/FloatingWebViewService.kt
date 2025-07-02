@@ -8,9 +8,12 @@ import android.app.Service
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
+import android.graphics.Color
 import android.graphics.PixelFormat
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.util.Log
 import android.view.*
 import android.view.inputmethod.InputMethodManager
@@ -134,23 +137,60 @@ class FloatingWebViewService : Service() {
             setSupportZoom(true)
             builtInZoomControls = true
             displayZoomControls = false
+            allowFileAccess = true
+            allowContentAccess = true
         }
+
+        webView.isFocusable = true
+        webView.isFocusableInTouchMode = true
+        webView.isLongClickable = true
+        webView.isHapticFeedbackEnabled = true
 
         webView.webViewClient = WebViewClient()
         webView.loadUrl(url)
 
+        // Enable touch + keyboard + selection context menu
         webView.setOnTouchListener { v, event ->
             if (event.action == MotionEvent.ACTION_DOWN || event.action == MotionEvent.ACTION_UP) {
-                if (params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE != 0) {
+                if ((params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) != 0) {
+                    // Remove NOT_FOCUSABLE to allow interaction
                     params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
                     windowManager.updateViewLayout(rootView, params)
-                    webView.requestFocus()
 
-                    val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
-                    imm.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0)
+                    v.post {
+                        v.requestFocus()
+                        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+                        imm.showSoftInput(v, InputMethodManager.SHOW_IMPLICIT)
+                    }
                 }
             }
             false
+        }
+
+        // This ensures ACTION_MODE for selection stays
+        webView.setOnLongClickListener {
+            if ((params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) != 0) {
+                params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
+                windowManager.updateViewLayout(rootView, params)
+            }
+
+            webView.requestFocus()
+            // Let WebView handle the long press natively (do not consume)
+            false
+        }
+
+        webView.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                // Delay restoring NOT_FOCUSABLE until after text selection
+                Handler(Looper.getMainLooper()).postDelayed({
+                    if ((params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) == 0) {
+                        params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        try {
+                            windowManager.updateViewLayout(rootView, params)
+                        } catch (_: Exception) {}
+                    }
+                }, 3000) // Wait enough time for user to select text
+            }
         }
     }
 
@@ -261,12 +301,18 @@ class FloatingWebViewService : Service() {
         })
     }
 
-    private fun setupJsToggle(jsToggle: LinearLayout, jsStatusIcon: TextView, webView: WebView) {
+    private fun setupJsToggle(jsToggle: LinearLayout, jsStatusIndicator: View, webView: WebView) {
         jsToggle.setOnClickListener {
             isJavaScriptEnabled = !isJavaScriptEnabled
             webView.settings.javaScriptEnabled = isJavaScriptEnabled
             webView.reload()
-            jsStatusIcon.text = if (isJavaScriptEnabled) "🟢" else "🔴"
+
+            val drawableRes = if (isJavaScriptEnabled) {
+                R.drawable.circle_green
+            } else {
+                R.drawable.circle_red
+            }
+            jsStatusIndicator.setBackgroundResource(drawableRes)
 
             Toast.makeText(
                 this,
@@ -275,6 +321,7 @@ class FloatingWebViewService : Service() {
             ).show()
         }
     }
+
 
     private fun removeWindow(windowId: Int) {
         try {
