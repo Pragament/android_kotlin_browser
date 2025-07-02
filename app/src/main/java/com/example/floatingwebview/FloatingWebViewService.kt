@@ -7,9 +7,11 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -27,17 +29,29 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.example.floatingwebview.databinding.FloatingWebViewLayoutBinding
+import com.example.floatingwebview.home.AppDatabase
+import com.example.floatingwebview.home.VisitedPage
+import com.example.floatingwebview.home.VisitedPageDao
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+
 // ... (package and imports remain unchanged)
+
 class FloatingWebViewService : Service() {
     private val windowManager by lazy { getSystemService(WINDOW_SERVICE) as WindowManager }
     private val activeWindows = mutableMapOf<Int, Pair<View, WindowManager.LayoutParams>>()
     private var nextWindowId = 0
-
+    private val openedUrls = mutableSetOf<String>()
+    var openurlmacther=""
     private val CHANNEL_ID = "FloatingWebViewChannel"
     private val NOTIFICATION_ID = 101
 
     // Global toggle flag
     private var isJavaScriptEnabled = true
+    private lateinit var visitedPageDao: VisitedPageDao
+    private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -45,6 +59,7 @@ class FloatingWebViewService : Service() {
         super.onCreate()
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, createNotification())
+        visitedPageDao = AppDatabase.getInstance(applicationContext).visitedPageDao()
     }
 
     private fun createNotificationChannel() {
@@ -80,8 +95,20 @@ class FloatingWebViewService : Service() {
         }
         return START_NOT_STICKY
     }
-
+var count=0;
+    var opentab=true
     private fun showFloatingWebView(url: String, size: String = "medium") {
+        if (opentab&&openedUrls.contains(openurlmacther)) {
+            Log.d("FloatingWebView", "URL already opened: $url")
+            return
+        }
+        opentab=true;
+        if(count==0){
+            openurlmacther=url
+            count++;
+        }
+        openedUrls.add(url)
+        count++;
         val windowId = nextWindowId++
         val inflater = getSystemService(LAYOUT_INFLATER_SERVICE) as LayoutInflater
         val binding = FloatingWebViewLayoutBinding.inflate(inflater)
@@ -112,12 +139,22 @@ class FloatingWebViewService : Service() {
             y = 100 + (nextWindowId * 30)
         }
 
-        setupWebView(binding.webView, url, rootView, params)
+        // Get the WindowManager and Context
+        val windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        val context = this // or applicationContext if not in an Activity/Service
+
+        setupWebView(
+            binding.webView, url, rootView, params,
+            windowManager = windowManager,
+            context = context
+        )
         setupCloseButton(binding.closeButton, windowId)
         setupDragListener(binding.headerView, windowId)
         setupMoreOptionsButton(binding.moreOptionsButton, binding.webView)
         setupResizeListener(binding.resizeHandle, rootView, params)
         setupJsToggle(binding.jsToggle, binding.jsStatusIcon, binding.webView)
+        val drawableRes = if (isJavaScriptEnabled) R.drawable.circle_green else R.drawable.circle_red
+        binding.jsStatusIcon.setBackgroundResource(drawableRes)
 
         try {
             windowManager.addView(rootView, params)
@@ -126,8 +163,15 @@ class FloatingWebViewService : Service() {
             binding.webView.destroy()
         }
     }
-
-    private fun setupWebView(webView: WebView, url: String, rootView: View, params: WindowManager.LayoutParams) {
+    private var lastVisitedUrl: String? = null
+    private fun setupWebView(
+        webView: WebView,
+        url: String,
+        rootView: View,
+        params: WindowManager.LayoutParams,
+        windowManager: WindowManager,
+        context: Context
+    ) {
         WebView.setWebContentsDebuggingEnabled(true)
         webView.settings.apply {
             javaScriptEnabled = isJavaScriptEnabled
@@ -149,17 +193,15 @@ class FloatingWebViewService : Service() {
         webView.webViewClient = WebViewClient()
         webView.loadUrl(url)
 
-        // Enable touch + keyboard + selection context menu
+        // Remove FLAG_NOT_FOCUSABLE on user interaction
         webView.setOnTouchListener { v, event ->
             if (event.action == MotionEvent.ACTION_DOWN || event.action == MotionEvent.ACTION_UP) {
                 if ((params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) != 0) {
-                    // Remove NOT_FOCUSABLE to allow interaction
                     params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
                     windowManager.updateViewLayout(rootView, params)
-
                     v.post {
                         v.requestFocus()
-                        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+                        val imm = context.getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
                         imm.showSoftInput(v, InputMethodManager.SHOW_IMPLICIT)
                     }
                 }
@@ -167,29 +209,62 @@ class FloatingWebViewService : Service() {
             false
         }
 
-        // This ensures ACTION_MODE for selection stays
+
+        webView.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView?, url: String?) {
+                super.onPageFinished(view, url)
+
+                val actualUrl = url ?: return
+
+                // 🔁 Don't save if it's the same as last visited
+                if (actualUrl == lastVisitedUrl) return
+
+                lastVisitedUrl = actualUrl
+
+                val title = view?.title ?: actualUrl
+                val faviconUrl = "https://www.google.com/s2/favicons?domain=${Uri.parse(actualUrl).host}&sz=64"
+
+                saveVisitedPage(actualUrl, title, faviconUrl)
+            }
+        }
+
+
         webView.setOnLongClickListener {
             if ((params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) != 0) {
                 params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
                 windowManager.updateViewLayout(rootView, params)
             }
-
             webView.requestFocus()
-            // Let WebView handle the long press natively (do not consume)
-            false
+            false // Let the default text selection ActionMode handle long press
         }
 
+        // Remove the setOnFocusChangeListener that resets FLAG_NOT_FOCUSABLE after 3 seconds!
+        // If you want to restore FLAG_NOT_FOCUSABLE, do it only when the WebView actually loses focus:
         webView.setOnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) {
-                // Delay restoring NOT_FOCUSABLE until after text selection
-                Handler(Looper.getMainLooper()).postDelayed({
-                    if ((params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) == 0) {
-                        params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                        try {
-                            windowManager.updateViewLayout(rootView, params)
-                        } catch (_: Exception) {}
-                    }
-                }, 3000) // Wait enough time for user to select text
+            if (!hasFocus) {
+                // Only set FLAG_NOT_FOCUSABLE when focus is lost
+                if ((params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) == 0) {
+                    params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                    try {
+                        windowManager.updateViewLayout(rootView, params)
+                    } catch (_: Exception) {}
+                }
+            }
+        }
+
+        // DO NOT add setOnCreateContextMenuListener for text selection!
+        // The default selection handles and floating ActionMode will appear automatically.
+    }
+
+    private fun saveVisitedPage(url: String, title: String, faviconUrl: String) {
+        val currentTimestamp = System.currentTimeMillis()
+        val page = VisitedPage(url = url, title = title, faviconUrl = faviconUrl, timestamp = currentTimestamp)
+
+        serviceScope.launch {
+            try {
+                visitedPageDao.insert(page)
+            } catch (e: Exception) {
+                Log.e("FloatingWebViewService", "Error saving visited page", e)
             }
         }
     }
@@ -253,6 +328,7 @@ class FloatingWebViewService : Service() {
                         true
                     }
                     R.id.new_tab -> {
+                        opentab=false
                         showFloatingWebView(webView.url ?: "https://www.google.com", "medium")
                         true
                     }
