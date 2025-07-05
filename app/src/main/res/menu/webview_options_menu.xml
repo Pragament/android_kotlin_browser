@@ -1,23 +1,17 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
         android:id="@+id/go_back"
-        android:title="Go back"
-        android:icon="@drawable/ic_back" />
-
+        android:title="Back"/>
     <item
         android:id="@+id/go_forward"
-        android:title="Go forward"
-        android:icon="@drawable/ic_forward" />
-
+        android:title="Forward"/>
     <item
         android:id="@+id/reload"
-        android:title="Reload"
-        android:icon="@drawable/ic_reload" />
-
+        android:title="Reload"/>
     <item
         android:id="@+id/new_tab"
-        android:title="New tab"
-        android:icon="@drawable/ic_new_tab" />
-
-
+        android:title="New Tab"/>
+    <item
+        android:id="@+id/copy_selected_text"
+        android:title="Copy Selected Text"/>
 </menu>

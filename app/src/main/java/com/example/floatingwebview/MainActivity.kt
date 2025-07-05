@@ -60,17 +60,20 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Start floating view on click
-         var lastClickTime = 0L
+        var lastClickTime = 0L
 
         binding.startButton.setOnClickListener {
+
+          Toast.makeText(this,"oopen",Toast.LENGTH_SHORT).show()
             val currentTime = System.currentTimeMillis()
-            if (currentTime - lastClickTime < 1000) return@setOnClickListener // Ignore double clicks
+            if (currentTime - lastClickTime < 2000) return@setOnClickListener // Ignore double clicks
             lastClickTime = currentTime
 
             if (Settings.canDrawOverlays(this)) {
                 val input = binding.urlEditText.text.toString().trim()
                 if (input.isNotEmpty()) {
                     fetchTitleAndLaunch(input)
+
                     binding.urlEditText.text.clear()
                 }else{
                     Toast.makeText(this, "Please enter a URL", Toast.LENGTH_SHORT).show()
@@ -96,27 +99,26 @@ class MainActivity : AppCompatActivity() {
         try{
             if(count==0){
                 count++;
-        val url = if (Patterns.WEB_URL.matcher(input).matches() || input.startsWith("http")) {
-            input
-        } else {
-            "https://www.google.com/search?q=" + URLEncoder.encode(input, "UTF-8")
-        }
+                val url = if (Patterns.WEB_URL.matcher(input).matches() || input.startsWith("http")) {
+                    input
+                } else {
+                    "https://www.google.com/search?q=" + URLEncoder.encode(input, "UTF-8")
+                }
 
-        val webView = WebView(this)
-        webView.settings.javaScriptEnabled = true
-        webView.webViewClient = object : WebViewClient() {
-            override fun onPageFinished(view: WebView?, urlStr: String?) {
-                val title = view?.title ?: ""
-                viewModel.saveVisitedPage(url, title)
-                startFloatingWebView(url, title)
-            }
-        }
-        webView.loadUrl(url)
+                val webView = WebView(this)
+                webView.settings.javaScriptEnabled = true
+                webView.webViewClient = object : WebViewClient() {
+                    override fun onPageFinished(view: WebView?, urlStr: String?) {
+                        val title = view?.title ?: ""
+                        viewModel.saveVisitedPage(url, title)
+                        startFloatingWebView(url, title)
+                    }
+                }
+                webView.loadUrl(url)
+                count--
             }
         }catch (e: Exception){
 
-        }finally {
-            count--;
         }
     }
 
