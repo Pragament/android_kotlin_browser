@@ -20,7 +20,7 @@
         android:theme="@style/Theme.AppCompat.Light.NoActionBar"
         tools:targetApi="31">
         <activity android:name=".history.HistoryActivity" />
-
+        <activity android:name=".Simpleweb" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

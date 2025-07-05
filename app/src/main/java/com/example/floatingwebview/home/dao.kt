@@ -26,13 +26,19 @@ interface VisitedPageDao {
 
 
     @Query("""
-    SELECT * FROM visited_pages 
-    WHERE (url, timestamp) IN (
-        SELECT url, MAX(timestamp) FROM visited_pages GROUP BY url
+    SELECT * FROM visited_pages
+    WHERE url IN (
+        SELECT url
+        FROM visited_pages
+        GROUP BY url
+        ORDER BY COUNT(*) DESC
+        LIMIT 5
     )
-    ORDER BY timestamp DESC
-    LIMIT 5
+    AND id IN (
+        SELECT MAX(id)
+        FROM visited_pages
+        GROUP BY url
+    )
 """)
-
     fun getRecentUniquePages5(): Flow<List<VisitedPage>>
 }
