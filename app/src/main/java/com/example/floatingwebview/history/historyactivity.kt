@@ -21,6 +21,7 @@ import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import com.example.floatingwebview.R
+import com.example.floatingwebview.Simpleweb
 import com.example.floatingwebview.YourApplication
 import com.example.floatingwebview.home.HomeViewModel
 import com.example.floatingwebview.home.HomeViewModelFactory
@@ -49,10 +50,14 @@ class HistoryActivity : AppCompatActivity() {
         val clearButton = findViewById<Button>(R.id.clearAllButton)
 
         adapter = VisitedPageAdapter1(
-            onItemClick = { /* Optional: Handle item click */ },
-            onDeleteClick = { viewModel.deletePage(it.id)
-            }
+            onItemClick = { visitedPage ->
+                val intent = Intent(this, Simpleweb::class.java)
+                intent.putExtra("url", visitedPage.url)
+                startActivity(intent)
+            },
+            onDeleteClick = { viewModel.deletePage(it.id) }
         )
+
 
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = adapter

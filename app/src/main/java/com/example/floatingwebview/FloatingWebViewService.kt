@@ -27,6 +27,7 @@ import android.widget.LinearLayout
 import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
+import androidx.compose.runtime.mutableStateOf
 import androidx.core.app.NotificationCompat
 import com.example.floatingwebview.databinding.FloatingWebViewLayoutBinding
 import com.example.floatingwebview.home.AppDatabase
@@ -60,6 +61,7 @@ class FloatingWebViewService : Service() {
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, createNotification())
         visitedPageDao = AppDatabase.getInstance(applicationContext).visitedPageDao()
+        Log.d("FloatingWebViewService", "URL opened:create  ")
     }
 
     private fun createNotificationChannel() {
@@ -84,31 +86,36 @@ class FloatingWebViewService : Service() {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }
-
+    var count= mutableStateOf(0);
+    var opentab=true
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d("FloatingWebViewService", "URL opened:onStartcommand ")
         try {
             val url = intent?.getStringExtra("url") ?: "https://www.google.com"
             val size = intent?.getStringExtra("size") ?: "medium"
+
+            openurlmacther = url // assuming this is a global variable
+            if (opentab && openedUrls.contains(url)) {
+                Log.d("FloatingWebViewService", "URL already opened: $url")
+                return START_NOT_STICKY
+            }
+
+            opentab = true
+            openedUrls.add(url)
+
             showFloatingWebView(url, size)
+
         } catch (e: Exception) {
+            e.printStackTrace()
             stopSelf()
         }
+
         return START_NOT_STICKY
     }
-var count=0;
-    var opentab=true
+
     private fun showFloatingWebView(url: String, size: String = "medium") {
-        if (opentab&&openedUrls.contains(openurlmacther)) {
-            Log.d("FloatingWebView", "URL already opened: $url")
-            return
-        }
-        opentab=true;
-        if(count==0){
-            openurlmacther=url
-            count++;
-        }
-        openedUrls.add(url)
-        count++;
+        Log.d("FloatingWebViewService", "URL already opened: $url")
+        count.value++;
         val windowId = nextWindowId++
         val inflater = getSystemService(LAYOUT_INFLATER_SERVICE) as LayoutInflater
         val binding = FloatingWebViewLayoutBinding.inflate(inflater)
@@ -148,6 +155,8 @@ var count=0;
             windowManager = windowManager,
             context = context
         )
+        setupHomeButton(binding.homeButton, binding.webView, context, windowId, windowManager)
+
         setupCloseButton(binding.closeButton, windowId)
         setupDragListener(binding.headerView, windowId)
         setupMoreOptionsButton(binding.moreOptionsButton, binding.webView)
@@ -252,6 +261,7 @@ var count=0;
             }
         }
 
+
         // DO NOT add setOnCreateContextMenuListener for text selection!
         // The default selection handles and floating ActionMode will appear automatically.
     }
@@ -272,8 +282,38 @@ var count=0;
     private fun setupCloseButton(closeButton: ImageButton, windowId: Int) {
         closeButton.setOnClickListener {
             removeWindow(windowId)
+            openedUrls.clear()
         }
     }
+    private fun setupHomeButton(
+        homeButton: ImageButton,
+        webView: WebView,
+        context: Context,
+        windowId: Int,
+        windowManager: WindowManager
+    ) {
+        homeButton.setOnClickListener {
+            val currentUrl = webView.url ?: "https://www.google.com"
+
+            // Close this floating WebView window before opening activity
+            val view = activeWindows[windowId]?.first
+            if (view != null) {
+                try {
+                    windowManager.removeView(view)
+                } catch (_: Exception) {}
+                activeWindows.remove(windowId)
+            }
+            openedUrls.clear()
+
+            // Launch new Activity
+            val intent = Intent(context, Simpleweb::class.java)
+            intent.putExtra("url", currentUrl)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+        }
+    }
+
+
 
     private fun setupDragListener(headerView: View, windowId: Int) {
         headerView.setOnTouchListener { view, event ->
@@ -405,6 +445,7 @@ var count=0;
                 windowManager.removeView(view)
                 (view.findViewById<WebView>(R.id.webView))?.destroy()
                 activeWindows.remove(windowId)
+                openedUrls.clear()
             }
             if (activeWindows.isEmpty()) stopSelf()
         } catch (_: Exception) {}
