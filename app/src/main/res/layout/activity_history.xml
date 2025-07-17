@@ -24,7 +24,7 @@
         android:id="@+id/clearAllButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Clear All"
+        android:text="@string/clear_all"
         android:layout_margin="8dp"
         android:visibility="gone" />
 </LinearLayout>

@@ -23,7 +23,7 @@
             android:layout_height="48dp"
             android:src="@drawable/ic_back"
             android:background="@android:color/transparent"
-            android:contentDescription="Back" />
+            android:contentDescription="@string/back" />
 
         <!-- Forward Button -->
         <ImageButton
@@ -32,7 +32,7 @@
             android:layout_height="48dp"
             android:src="@drawable/ic_forward"
             android:background="@android:color/transparent"
-            android:contentDescription="Forward" />
+            android:contentDescription="@string/forward" />
 
         <ImageButton
             android:id="@+id/floatweb"
@@ -40,8 +40,9 @@
             android:layout_height="48dp"
             android:src="@drawable/ic_floatweb"
             android:background="@android:color/transparent"
-            android:contentDescription="Back"
-           />
+            android:contentDescription="@string/back"
+
+            />
         <!-- Home Button -->
         <ImageButton
             android:id="@+id/homeButton"
@@ -58,7 +59,8 @@
             android:layout_height="48dp"
             android:src="@drawable/ic_reload"
             android:background="@android:color/transparent"
-            android:contentDescription="Refresh" />
+            android:contentDescription="@string/refresh"
+            />
 
         <!-- Search Field Container -->
         <LinearLayout
@@ -76,7 +78,7 @@
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:layout_weight="1"
-                android:hint="Search or type URL"
+                android:hint="@string/search_or_url_hint"
                 android:background="@android:color/transparent"
                 android:inputType="textUri"
                 android:singleLine="true"
@@ -88,7 +90,8 @@
                 android:layout_height="48dp"
                 android:src="@drawable/ic_forward"
                 android:background="@drawable/rounded_bg"
-                android:contentDescription="Go" />
+                android:contentDescription="@string/go"
+                />
         </LinearLayout>
     </LinearLayout>
 

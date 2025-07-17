@@ -46,28 +46,32 @@ class Simpleweb : AppCompatActivity() {
 
         // WebView settings
         webView.settings.javaScriptEnabled = true
-        webView.webViewClient = WebViewClient()
+        webView.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView?, url: String?) {
+                urlEditText.setText(url ?: "")
+                updateNavigationButtons() // 👈 Auto hide/show buttons
+            }
+        }
 
         // Load passed URL or Google by default
         val passedUrl = intent.getStringExtra("url") ?: "https://www.google.com"
         webView.loadUrl(passedUrl)
         urlEditText.setText(passedUrl)
 
-        // Update EditText when URL changes
-        webView.webViewClient = object : WebViewClient() {
-            override fun onPageFinished(view: WebView?, url: String?) {
-                urlEditText.setText(url ?: "")
-            }
-        }
-
         // Button: Back
         backButton.setOnClickListener {
-            if (webView.canGoBack()) webView.goBack()
+            if (webView.canGoBack()) {
+                webView.goBack()
+                updateNavigationButtons()
+            }
         }
 
         // Button: Forward
         forwardButton.setOnClickListener {
-            if (webView.canGoForward()) webView.goForward()
+            if (webView.canGoForward()) {
+                webView.goForward()
+                updateNavigationButtons()
+            }
         }
 
         // Button: Home
@@ -90,7 +94,7 @@ class Simpleweb : AppCompatActivity() {
             forwardButton.visibility = visibility
             homeButton.visibility = visibility
             refreshButton.visibility = visibility
-            floatWebButton.visibility=visibility
+            floatWebButton.visibility = visibility
         }
 
         // Button: Go
@@ -124,8 +128,8 @@ class Simpleweb : AppCompatActivity() {
 
         return if (isDomain) {
             val cleaned = cleanInput
-                .removePrefix("http://")
                 .removePrefix("https://")
+                .removePrefix("http://")
                 .removePrefix("www.")
             "https://www.$cleaned"
         } else {
@@ -148,4 +152,10 @@ class Simpleweb : AppCompatActivity() {
         val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
         imm.hideSoftInputFromWindow(urlEditText.windowToken, 0)
     }
+
+    private fun updateNavigationButtons() {
+        backButton.visibility = if (webView.canGoBack()) View.VISIBLE else View.GONE
+        forwardButton.visibility = if (webView.canGoForward()) View.VISIBLE else View.GONE
+    }
+
 }

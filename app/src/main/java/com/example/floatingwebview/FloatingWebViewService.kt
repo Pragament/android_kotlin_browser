@@ -38,7 +38,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
-// ... (package and imports remain unchanged)
+
 
 class FloatingWebViewService : Service() {
     private val windowManager by lazy { getSystemService(WINDOW_SERVICE) as WindowManager }
@@ -99,7 +99,6 @@ class FloatingWebViewService : Service() {
                 Log.d("FloatingWebViewService", "URL already opened: $url")
                 return START_NOT_STICKY
             }
-
             opentab = true
             openedUrls.add(url)
 
@@ -225,7 +224,7 @@ class FloatingWebViewService : Service() {
 
                 val actualUrl = url ?: return
 
-                // 🔁 Don't save if it's the same as last visited
+
                 if (actualUrl == lastVisitedUrl) return
 
                 lastVisitedUrl = actualUrl
@@ -244,11 +243,10 @@ class FloatingWebViewService : Service() {
                 windowManager.updateViewLayout(rootView, params)
             }
             webView.requestFocus()
-            false // Let the default text selection ActionMode handle long press
+            false
         }
 
-        // Remove the setOnFocusChangeListener that resets FLAG_NOT_FOCUSABLE after 3 seconds!
-        // If you want to restore FLAG_NOT_FOCUSABLE, do it only when the WebView actually loses focus:
+
         webView.setOnFocusChangeListener { _, hasFocus ->
             if (!hasFocus) {
                 // Only set FLAG_NOT_FOCUSABLE when focus is lost
@@ -262,8 +260,6 @@ class FloatingWebViewService : Service() {
         }
 
 
-        // DO NOT add setOnCreateContextMenuListener for text selection!
-        // The default selection handles and floating ActionMode will appear automatically.
     }
 
     private fun saveVisitedPage(url: String, title: String, faviconUrl: String) {
@@ -342,6 +338,21 @@ class FloatingWebViewService : Service() {
             val popup = PopupMenu(this, moreButton)
             popup.menuInflater.inflate(R.menu.webview_options_menu, popup.menu)
 
+            // Disable Back/Forward if not applicable
+            val backItem = popup.menu.findItem(R.id.go_back)
+            val forwardItem = popup.menu.findItem(R.id.go_forward)
+
+            val canGoBack = webView.canGoBack()
+            val canGoForward = webView.canGoForward()
+
+            backItem.isEnabled = canGoBack
+            forwardItem.isEnabled = canGoForward
+
+            // Optional: Tint the icons to gray if disabled (requires icons in menu)
+            tintMenuIcon(backItem, canGoBack)
+            tintMenuIcon(forwardItem, canGoForward)
+
+            // Handle focusable flags for popup menu window
             val parentView = moreButton.rootView
             val windowId = activeWindows.entries.find { it.value.first == parentView }?.key
             val params = activeWindows[windowId]?.second
@@ -368,8 +379,22 @@ class FloatingWebViewService : Service() {
                         true
                     }
                     R.id.new_tab -> {
-                        opentab=false
+                        opentab = false
                         showFloatingWebView(webView.url ?: "https://www.google.com", "medium")
+                        true
+                    }
+                    R.id.copy_selected_text -> {
+                        webView.evaluateJavascript("(function(){return window.getSelection().toString();})()") { selectedText ->
+                            val text = selectedText.trim('"')
+                            if (text.isNotEmpty()) {
+                                val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+                                val clip = ClipData.newPlainText("Copied Text", text)
+                                clipboard.setPrimaryClip(clip)
+                                Toast.makeText(this, "Text copied", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(this, "No text selected", Toast.LENGTH_SHORT).show()
+                            }
+                        }
                         true
                     }
                     else -> false
@@ -385,6 +410,11 @@ class FloatingWebViewService : Service() {
 
             popup.show()
         }
+    }
+    private fun tintMenuIcon(item: MenuItem, isEnabled: Boolean) {
+        item.icon?.mutate()?.setTint(
+            if (isEnabled) Color.BLACK else Color.GRAY
+        )
     }
 
     private fun setupResizeListener(resizeHandle: ImageView, rootView: View, params: WindowManager.LayoutParams) {

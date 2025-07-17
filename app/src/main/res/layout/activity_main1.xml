@@ -23,7 +23,7 @@
         android:ellipsize="end"
         android:maxLines="1"
         android:gravity="center"
-        android:text="Facebook"
+        android:text="@string/site_title_facebook"
         android:textColor="#000"
         android:textSize="12sp"
         android:layout_marginTop="4dp"/>
