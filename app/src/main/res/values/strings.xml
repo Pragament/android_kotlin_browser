@@ -1,3 +1,29 @@
 <resources>
-    <string name="app_name">FloatingWebView</string>
+    <string name="app_name">Multitasking Browser</string>
+    <string name="clear_all">Clear All</string>
+    <string name="app_title">Float Browser</string>
+    <string name="more_options">More</string>
+    <string name="center_icon_desc">Icon</string>
+    <string name="url_hint">Search or type URL</string>
+    <string name="go_button">Go</string>
+    <string name="recently_visited">Recently Visited</string>
+    <string name="site_title_facebook">Facebook</string>
+    <string name="more_options1">More Options</string>
+    <string name="home">Home</string>
+    <string name="js_label">JS</string>
+    <string name="close">Close</string>
+    <string name="resize">Resize</string>
+    <string name="title">Title</string>
+    <string name="example_url">https://example.com</string>
+    <string name="delete">Delete</string>
+    <string name="back">Back</string>
+    <string name="forward">Forward</string>
+    <string name="refresh">Refresh</string>
+    <string name="go">Go</string>
+    <string name="search_or_url_hint">Search or type URL</string>
+    <string name="menu_back">Back</string>
+    <string name="menu_forward">Forward</string>
+    <string name="menu_reload">Reload</string>
+    <string name="menu_new_tab">New Tab</string>
+    <string name="menu_copy_selected_text">Copy Selected Text</string>
 </resources>

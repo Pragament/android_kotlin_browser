@@ -23,7 +23,7 @@
             android:id="@+id/pageTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Title"
+            android:text="@string/title"
             android:textColor="#000"
             android:textStyle="bold" />
 
@@ -31,7 +31,7 @@
             android:id="@+id/pageUrl"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="https://example.com"
+            android:text="@string/example_url"
             android:textColor="#444" />
     </LinearLayout>
 
@@ -41,5 +41,5 @@
         android:layout_height="56dp"
         android:src="@android:drawable/ic_menu_delete"
         android:background="@android:color/transparent"
-        android:contentDescription="Delete" />
+        android:contentDescription="@string/delete" />
 </LinearLayout>

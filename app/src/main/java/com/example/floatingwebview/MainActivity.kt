@@ -54,10 +54,11 @@ class MainActivity : AppCompatActivity() {
 
         // Observe recent visited pages
         lifecycleScope.launch {
-            viewModel.recentPages5.collectLatest {
-                adapter.submitList(it)
+            viewModel.recentPages5.collectLatest { list ->
+                adapter.submitList(list.reversed())
             }
         }
+
 
         // Start floating view on click
         var lastClickTime = 0L
@@ -99,11 +100,7 @@ class MainActivity : AppCompatActivity() {
         try{
             if(count==0){
                 count++;
-                val url = if (Patterns.WEB_URL.matcher(input).matches() || input.startsWith("http")) {
-                    input
-                } else {
-                    "https://www.google.com/search?q=" + URLEncoder.encode(input, "UTF-8")
-                }
+                val url = convertInputToUrl(input)
 
                 val webView = WebView(this)
                 webView.settings.javaScriptEnabled = true
@@ -119,6 +116,20 @@ class MainActivity : AppCompatActivity() {
             }
         }catch (e: Exception){
 
+        }
+    }
+    private fun convertInputToUrl(input: String): String {
+        val cleanInput = input.lowercase().trim()
+        val isDomain = Regex("""\.[a-z]{2,}""").containsMatchIn(cleanInput)
+
+        return if (isDomain) {
+            val cleaned = cleanInput
+                .removePrefix("https://")
+                .removePrefix("http://")
+                .removePrefix("www.")
+            "https://www.$cleaned"
+        } else {
+            "https://www.google.com/search?q=${Uri.encode(cleanInput)}"
         }
     }
 
