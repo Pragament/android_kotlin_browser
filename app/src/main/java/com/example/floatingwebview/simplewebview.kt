@@ -120,6 +120,13 @@ class Simpleweb : AppCompatActivity() {
                 startActivity(intent)
             }
         }
+
+        val intentData = intent?.data
+        if (intentData != null) {
+            val url = intentData.toString()
+            startFloatingWebView(url)
+            finish()
+        }
     }
 
     private fun convertInputToUrl(input: String): String {
