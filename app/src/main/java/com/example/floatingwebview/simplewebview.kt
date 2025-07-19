@@ -7,17 +7,27 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
+import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.ImageButton
+import android.widget.ImageView
+import android.widget.ListView
+import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-
-import java.net.URLEncoder
+import com.example.floatingwebview.BrowserRepository.BrowserData
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import androidx.core.net.toUri
 
 class Simpleweb : AppCompatActivity() {
 
@@ -28,7 +38,7 @@ class Simpleweb : AppCompatActivity() {
     private lateinit var forwardButton: ImageButton
     private lateinit var homeButton: ImageButton
     private lateinit var refreshButton: ImageButton
-    private lateinit var floatWebButton: ImageButton
+    private lateinit var browserPickButton: ImageButton
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,7 +52,7 @@ class Simpleweb : AppCompatActivity() {
         forwardButton = findViewById(R.id.forwardButton)
         homeButton = findViewById(R.id.homeButton)
         refreshButton = findViewById(R.id.refreshButton)
-        floatWebButton = findViewById(R.id.floatweb)
+        browserPickButton = findViewById(R.id.browserPickButton)
 
         // WebView settings
         webView.settings.javaScriptEnabled = true
@@ -94,7 +104,7 @@ class Simpleweb : AppCompatActivity() {
             forwardButton.visibility = visibility
             homeButton.visibility = visibility
             refreshButton.visibility = visibility
-            floatWebButton.visibility = visibility
+            browserPickButton.visibility = visibility
         }
 
         // Button: Go
@@ -109,16 +119,10 @@ class Simpleweb : AppCompatActivity() {
             }
         }
 
-        // Button: Float WebView
-        floatWebButton.setOnClickListener {
-            if (Settings.canDrawOverlays(this)) {
-                val currentUrl = webView.url ?: "https://www.google.com"
-                startFloatingWebView(currentUrl)
-            } else {
-                Toast.makeText(this, "Please enable overlay permission", Toast.LENGTH_SHORT).show()
-                val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
-                startActivity(intent)
-            }
+        // Button: Browser Picker
+        browserPickButton.setOnClickListener {
+            val currentUrl = webView.url ?: "https://www.google.com"
+            showBrowserPicker(this, currentUrl)
         }
 
         val intentData = intent?.data
@@ -128,6 +132,56 @@ class Simpleweb : AppCompatActivity() {
             finish()
         }
     }
+
+    fun showBrowserPicker(context: Context, url: String) {
+        CoroutineScope(Dispatchers.Main).launch {
+            val repo = BrowserRepository(context)
+            val browsers = withContext(Dispatchers.IO) {
+                repo.getBrowsers(url.toUri())
+            }
+
+            if (browsers.isEmpty()) {
+                Toast.makeText(context, "No browsers found", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+
+            val adapter = object : ArrayAdapter<BrowserData>(context, R.layout.browser_item_list, browsers) {
+                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                    val view = convertView ?: LayoutInflater.from(context)
+                        .inflate(R.layout.browser_item_list, parent, false)
+
+                    val browser = getItem(position)
+                    view.findViewById<ImageView>(R.id.browserIcon).setImageDrawable(browser?.icon)
+                    view.findViewById<TextView>(R.id.browserName).text = browser?.label ?: "Unknown"
+
+                    return view
+                }
+            }
+
+            val listView = ListView(context).apply {
+                this.adapter = adapter
+            }
+
+            val dialog = AlertDialog.Builder(context)
+                .setTitle("Open with...")
+                .setView(listView)
+                .setCancelable(true)
+                .create()
+
+            listView.setOnItemClickListener { _, _, position, _ ->
+                val selectedBrowser = browsers[position]
+                val intent = Intent(Intent.ACTION_VIEW, url.toUri()).apply {
+                    setPackage(selectedBrowser.packageName)
+                    addCategory(Intent.CATEGORY_BROWSABLE)
+                }
+                context.startActivity(intent)
+                dialog.dismiss()
+            }
+
+            dialog.show()
+        }
+    }
+
 
     private fun convertInputToUrl(input: String): String {
         val cleanInput = input.lowercase().trim()
