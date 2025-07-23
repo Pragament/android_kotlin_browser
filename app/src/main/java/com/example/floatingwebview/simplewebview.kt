@@ -1,153 +1,137 @@
 package com.example.floatingwebview
 
-
-
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.view.ContextMenu
+import android.view.MenuItem
 import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.widget.EditText
-import android.widget.ImageButton
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-
-import java.net.URLEncoder
+import com.example.floatingwebview.databinding.SimpleWebViewBinding // Ensure you have View Binding enabled
 
 class Simpleweb : AppCompatActivity() {
 
-    private lateinit var webView: WebView
-    private lateinit var urlEditText: EditText
-    private lateinit var goButton: ImageButton
-    private lateinit var backButton: ImageButton
-    private lateinit var forwardButton: ImageButton
-    private lateinit var homeButton: ImageButton
-    private lateinit var refreshButton: ImageButton
-    private lateinit var floatWebButton: ImageButton
+    private lateinit var binding: SimpleWebViewBinding
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.simple_web_view)
+        binding = SimpleWebViewBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-        // Initialize Views
-        webView = findViewById(R.id.webView)
-        urlEditText = findViewById(R.id.urlEditText)
-        goButton = findViewById(R.id.goButton)
-        backButton = findViewById(R.id.backButton)
-        forwardButton = findViewById(R.id.forwardButton)
-        homeButton = findViewById(R.id.homeButton)
-        refreshButton = findViewById(R.id.refreshButton)
-        floatWebButton = findViewById(R.id.floatweb)
+        setupWebView()
+        setupClickListeners()
 
-        // WebView settings
-        webView.settings.javaScriptEnabled = true
-        webView.webViewClient = object : WebViewClient() {
+        // Register the EditText for the context menu
+        registerForContextMenu(binding.urlEditText)
+
+        handleInitialIntent()
+    }
+
+    // Creates the context menu when the view is long-pressed
+    override fun onCreateContextMenu(menu: ContextMenu?, v: View?, menuInfo: ContextMenu.ContextMenuInfo?) {
+        super.onCreateContextMenu(menu, v, menuInfo)
+        if (v?.id == binding.urlEditText.id) {
+            menu?.setHeaderTitle("Text Actions")
+            // Add menu items: menu.add(groupId, itemId, order, title)
+            menu?.add(0, 1, 0, "Copy")
+            menu?.add(0, 2, 1, "Copy All")
+            menu?.add(0, 3, 2, "Paste")
+        }
+    }
+
+    // Handles clicks on the context menu items
+    override fun onContextItemSelected(item: MenuItem): Boolean {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        when (item.itemId) {
+            1 -> { // Copy selected text
+                val start = binding.urlEditText.selectionStart
+                val end = binding.urlEditText.selectionEnd
+                if (start != end) {
+                    val selectedText = binding.urlEditText.text.substring(start, end)
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Copied Text", selectedText))
+                    Toast.makeText(this, "Text copied", Toast.LENGTH_SHORT).show()
+                }
+                return true
+            }
+            2 -> { // Copy all text
+                val allText = binding.urlEditText.text.toString()
+                if (allText.isNotEmpty()) {
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Copied Text", allText))
+                    Toast.makeText(this, "All text copied", Toast.LENGTH_SHORT).show()
+                }
+                return true
+            }
+            3 -> { // Paste text
+                clipboard.primaryClip?.getItemAt(0)?.text?.let {
+                    val start = binding.urlEditText.selectionStart.coerceAtLeast(0)
+                    val end = binding.urlEditText.selectionEnd.coerceAtLeast(0)
+                    binding.urlEditText.text.replace(start, end, it)
+                    Toast.makeText(this, "Text pasted", Toast.LENGTH_SHORT).show()
+                }
+                return true
+            }
+            else -> return super.onContextItemSelected(item)
+        }
+    }
+
+    private fun setupWebView() {
+        binding.webView.settings.javaScriptEnabled = true
+        binding.webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
-                urlEditText.setText(url ?: "")
-                updateNavigationButtons() // 👈 Auto hide/show buttons
-            }
-        }
-
-        // Load passed URL or Google by default
-        val passedUrl = intent.getStringExtra("url") ?: "https://www.google.com"
-        webView.loadUrl(passedUrl)
-        urlEditText.setText(passedUrl)
-
-        // Button: Back
-        backButton.setOnClickListener {
-            if (webView.canGoBack()) {
-                webView.goBack()
+                binding.urlEditText.setText(url ?: "")
                 updateNavigationButtons()
             }
         }
+    }
 
-        // Button: Forward
-        forwardButton.setOnClickListener {
-            if (webView.canGoForward()) {
-                webView.goForward()
-                updateNavigationButtons()
+    private fun setupClickListeners() {
+        binding.goButton.setOnClickListener {
+            val input = binding.urlEditText.text.toString().trim()
+            if (input.isNotBlank()) {
+                val finalUrl = convertInputToUrl(input)
+                binding.urlEditText.setText(finalUrl)
+                binding.urlEditText.clearFocus()
+                hideKeyboard()
+                binding.webView.loadUrl(finalUrl)
             }
         }
-
-        // Button: Home
-        homeButton.setOnClickListener {
-            val intent = Intent(this, MainActivity::class.java)
-            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
+        binding.backButton.setOnClickListener { if (binding.webView.canGoBack()) binding.webView.goBack() }
+        binding.forwardButton.setOnClickListener { if (binding.webView.canGoForward()) binding.webView.goForward() }
+        binding.refreshButton.setOnClickListener { binding.webView.reload() }
+        binding.homeButton.setOnClickListener {
+            val intent = Intent(this, MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
             startActivity(intent)
             finish()
         }
-
-        // Button: Refresh
-        refreshButton.setOnClickListener {
-            webView.reload()
-        }
-
-        // EditText focus hides nav buttons
-        urlEditText.setOnFocusChangeListener { _, hasFocus ->
-            val visibility = if (hasFocus) View.GONE else View.VISIBLE
-            backButton.visibility = visibility
-            forwardButton.visibility = visibility
-            homeButton.visibility = visibility
-            refreshButton.visibility = visibility
-            floatWebButton.visibility = visibility
-        }
-
-        // Button: Go
-        goButton.setOnClickListener {
-            val input = urlEditText.text.toString().trim()
-            if (input.isNotBlank()) {
-                val finalUrl = convertInputToUrl(input)
-                urlEditText.setText(finalUrl)
-                urlEditText.clearFocus()
-                hideKeyboard()
-                webView.loadUrl(finalUrl)
-            }
-        }
-
-        // Button: Float WebView
-        floatWebButton.setOnClickListener {
+        binding.floatweb.setOnClickListener {
             if (Settings.canDrawOverlays(this)) {
-                val currentUrl = webView.url ?: "https://www.google.com"
-                startFloatingWebView(currentUrl)
+                startFloatingWebView(binding.webView.url ?: "https://www.google.com")
             } else {
-                Toast.makeText(this, "Please enable overlay permission", Toast.LENGTH_SHORT).show()
                 val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
                 startActivity(intent)
             }
         }
-
-        val intentData = intent?.data
-        if (intentData != null) {
-            val url = intentData.toString()
-            startFloatingWebView(url)
-            finish()
-        }
     }
 
-    private fun convertInputToUrl(input: String): String {
-        val cleanInput = input.lowercase().trim()
-        val isDomain = Regex("""\.[a-z]{2,}""").containsMatchIn(cleanInput)
-
-        return if (isDomain) {
-            val cleaned = cleanInput
-                .removePrefix("https://")
-                .removePrefix("http://")
-                .removePrefix("www.")
-            "https://www.$cleaned"
-        } else {
-            "https://www.google.com/search?q=${Uri.encode(cleanInput)}"
-        }
+    private fun handleInitialIntent() {
+        val urlToLoad = intent?.getStringExtra("url") ?: "https://www.google.com"
+        binding.webView.loadUrl(urlToLoad)
+        binding.urlEditText.setText(urlToLoad)
     }
 
     private fun startFloatingWebView(url: String) {
-        val intent = Intent(this, FloatingWebViewService::class.java).apply {
-            putExtra("url", url)
-        }
+        val intent = Intent(this, FloatingWebViewService::class.java).apply { putExtra("url", url) }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(intent)
         } else {
@@ -155,14 +139,23 @@ class Simpleweb : AppCompatActivity() {
         }
     }
 
-    private fun hideKeyboard() {
-        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-        imm.hideSoftInputFromWindow(urlEditText.windowToken, 0)
+    private fun convertInputToUrl(input: String): String {
+        val cleanInput = input.lowercase().trim()
+        val isDomain = Regex("""\.[a-z]{2,}""").containsMatchIn(cleanInput)
+        return if (isDomain) {
+            "https://www.${cleanInput.removePrefix("https://").removePrefix("http://").removePrefix("www.")}"
+        } else {
+            "https://www.google.com/search?q=${Uri.encode(cleanInput)}"
+        }
     }
 
     private fun updateNavigationButtons() {
-        backButton.visibility = if (webView.canGoBack()) View.VISIBLE else View.GONE
-        forwardButton.visibility = if (webView.canGoForward()) View.VISIBLE else View.GONE
+        binding.backButton.visibility = if (binding.webView.canGoBack()) View.VISIBLE else View.GONE
+        binding.forwardButton.visibility = if (binding.webView.canGoForward()) View.VISIBLE else View.GONE
     }
 
+    private fun hideKeyboard() {
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.hideSoftInputFromWindow(binding.urlEditText.windowToken, 0)
+    }
 }

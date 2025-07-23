@@ -7,7 +7,6 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 
-// utils/FloatingWebViewHelper.kt
 object FloatingWebViewHelper {
 
     fun startFloatingWebView(context: Context, url: String, size: String = "medium") {
