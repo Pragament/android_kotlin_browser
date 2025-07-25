@@ -7,10 +7,12 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
+import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ArrayAdapter
@@ -56,6 +58,8 @@ class Simpleweb : AppCompatActivity() {
 
         // WebView settings
         webView.settings.javaScriptEnabled = true
+        CookieManager.getInstance().setAcceptCookie(true)
+        CookieManager.getInstance().setAcceptThirdPartyCookies(webView,true)
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 urlEditText.setText(url ?: "")
@@ -217,6 +221,11 @@ class Simpleweb : AppCompatActivity() {
     private fun updateNavigationButtons() {
         backButton.visibility = if (webView.canGoBack()) View.VISIBLE else View.GONE
         forwardButton.visibility = if (webView.canGoForward()) View.VISIBLE else View.GONE
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        CookieManager.getInstance().flush()
     }
 
 }
