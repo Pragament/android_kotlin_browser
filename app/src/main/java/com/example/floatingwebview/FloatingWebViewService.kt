@@ -19,6 +19,7 @@ import android.os.Looper
 import android.util.Log
 import android.view.*
 import android.view.inputmethod.InputMethodManager
+import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ImageButton
@@ -197,6 +198,9 @@ class FloatingWebViewService : Service() {
         webView.isFocusableInTouchMode = true
         webView.isLongClickable = true
         webView.isHapticFeedbackEnabled = true
+
+        CookieManager.getInstance().setAcceptCookie(true)
+        CookieManager.getInstance().setAcceptThirdPartyCookies(webView,true)
 
         webView.webViewClient = WebViewClient()
         webView.loadUrl(url)
@@ -483,6 +487,7 @@ class FloatingWebViewService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        CookieManager.getInstance().flush()
         activeWindows.keys.toList().forEach { removeWindow(it) }
     }
 
