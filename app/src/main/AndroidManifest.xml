@@ -61,5 +61,15 @@
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+
+        <activity
+            android:name=".FloatingWebActivity"
+            android:theme="@style/FloatingActivityTheme"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:windowIsTranslucent="true"
+            android:resizeableActivity="true" />
+
     </application>
 </manifest>

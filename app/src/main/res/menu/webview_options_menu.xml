@@ -14,4 +14,11 @@
     <item
         android:id="@+id/copy_selected_text"
         android:title="@string/menu_copy_selected_text" />
+    <item
+        android:id="@+id/paste"
+        android:title="@string/menu_paste" />
+    <item
+    android:id="@+id/copy_all"
+    android:title="@string/menu_copy_all" />
+
 </menu>
