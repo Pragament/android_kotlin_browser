@@ -11,17 +11,13 @@ import android.provider.Settings
 object FloatingWebViewHelper {
 
     fun startFloatingWebView(context: Context, url: String, size: String = "medium") {
-        val intent = Intent(context, FloatingWebViewService::class.java).apply {
+        val intent = Intent(context, FloatingWebActivity::class.java).apply {
             putExtra("url", url)
-            putExtra("size", size)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(intent)
-        } else {
-            context.startService(intent)
-        }
+        context.startActivity(intent)
     }
+
 
     fun requestOverlayPermission(activity: Activity) {
         val intent = Intent(
