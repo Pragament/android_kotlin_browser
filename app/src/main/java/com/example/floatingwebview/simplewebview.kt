@@ -1,18 +1,22 @@
 package com.example.floatingwebview
 
 
-
+import android.Manifest
+import android.app.DownloadManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import android.webkit.CookieManager
+import android.webkit.URLUtil
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ArrayAdapter
@@ -24,6 +28,8 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import com.example.floatingwebview.BrowserRepository.BrowserData
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +47,12 @@ class Simpleweb : AppCompatActivity() {
     private lateinit var homeButton: ImageButton
     private lateinit var refreshButton: ImageButton
     private lateinit var browserPickButton: ImageButton
+
+    private val STORAGE_PERMISSION_CODE = 1
+    private var downloadUrl: String? = null
+    private var downloadUserAgent: String? = null
+    private var downloadContentDisposition: String? = null
+    private var downloadMimetype: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,6 +76,23 @@ class Simpleweb : AppCompatActivity() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 urlEditText.setText(url ?: "")
                 updateNavigationButtons() // 👈 Auto hide/show buttons
+            }
+        }
+
+        // Handle downloads
+        webView.setDownloadListener { url, userAgent, contentDisposition, mimetype, _ ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                downloadFile(url, userAgent, contentDisposition, mimetype)
+            } else {
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+                    downloadFile(url, userAgent, contentDisposition, mimetype)
+                } else {
+                    this.downloadUrl = url
+                    this.downloadUserAgent = userAgent
+                    this.downloadContentDisposition = contentDisposition
+                    this.downloadMimetype = mimetype
+                    ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), STORAGE_PERMISSION_CODE)
+                }
             }
         }
 
@@ -137,6 +166,35 @@ class Simpleweb : AppCompatActivity() {
         }
     }
 
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == STORAGE_PERMISSION_CODE) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(this, "Permission Granted. Starting download...", Toast.LENGTH_SHORT).show()
+                if(downloadUrl != null) {
+                    downloadFile(downloadUrl!!, downloadUserAgent, downloadContentDisposition, downloadMimetype)
+                }
+            } else {
+                Toast.makeText(this, "Permission Denied. Download cannot proceed.", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun downloadFile(url: String, userAgent: String?, contentDisposition: String?, mimetype: String?) {
+        val request = DownloadManager.Request(Uri.parse(url))
+        request.setMimeType(mimetype)
+        val cookies = CookieManager.getInstance().getCookie(url)
+        request.addRequestHeader("cookie", cookies)
+        request.addRequestHeader("User-Agent", userAgent)
+        request.setDescription("Downloading file...")
+        request.setTitle(URLUtil.guessFileName(url, contentDisposition, mimetype))
+        request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+        request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, URLUtil.guessFileName(url, contentDisposition, mimetype))
+        val dm = getSystemService(DOWNLOAD_SERVICE) as DownloadManager
+        dm.enqueue(request)
+        Toast.makeText(applicationContext, "Downloading File", Toast.LENGTH_LONG).show()
+    }
+
     fun showBrowserPicker(context: Context, url: String) {
         CoroutineScope(Dispatchers.Main).launch {
             val repo = BrowserRepository(context)
@@ -189,7 +247,7 @@ class Simpleweb : AppCompatActivity() {
 
     private fun convertInputToUrl(input: String): String {
         val cleanInput = input.lowercase().trim()
-        val isDomain = Regex("""\.[a-z]{2,}""").containsMatchIn(cleanInput)
+        val isDomain = Regex(""".\[a-z]{2,}""").containsMatchIn(cleanInput)
 
         return if (isDomain) {
             val cleaned = cleanInput
