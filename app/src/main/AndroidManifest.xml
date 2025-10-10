@@ -69,7 +69,7 @@
             android:taskAffinity=""
             android:excludeFromRecents="true"
             android:launchMode="singleTask"
-            android.windowIsTranslucent="true"
+            android:windowIsTranslucent="true"
             android:resizeableActivity="true" />
 
     </application>
