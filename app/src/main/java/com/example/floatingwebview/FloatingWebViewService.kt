@@ -1,6 +1,7 @@
 package com.example.floatingwebview
 
 import android.annotation.SuppressLint
+import android.app.DownloadManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -12,6 +13,7 @@ import android.content.Intent
 import android.graphics.PixelFormat
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -19,6 +21,7 @@ import android.util.Log
 import android.view.*
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
+import android.webkit.URLUtil
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ImageButton
@@ -228,6 +231,22 @@ class FloatingWebViewService : Service() {
 
         CookieManager.getInstance().setAcceptCookie(true)
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
+
+        // Handle downloads
+        webView.setDownloadListener { url, userAgent, contentDisposition, mimetype, _ ->
+            val request = DownloadManager.Request(Uri.parse(url))
+            request.setMimeType(mimetype)
+            val cookies = CookieManager.getInstance().getCookie(url)
+            request.addRequestHeader("cookie", cookies)
+            request.addRequestHeader("User-Agent", userAgent)
+            request.setDescription("Downloading file...")
+            request.setTitle(URLUtil.guessFileName(url, contentDisposition, mimetype))
+            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, URLUtil.guessFileName(url, contentDisposition, mimetype))
+            val dm = getSystemService(DOWNLOAD_SERVICE) as DownloadManager
+            dm.enqueue(request)
+            Toast.makeText(applicationContext, "Downloading File", Toast.LENGTH_LONG).show()
+        }
 
         // Track touches
         webView.setOnTouchListener { v, event ->
