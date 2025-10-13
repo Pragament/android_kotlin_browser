@@ -157,13 +157,6 @@ class Simpleweb : AppCompatActivity() {
             val currentUrl = webView.url ?: "https://www.google.com"
             showBrowserPicker(this, currentUrl)
         }
-
-        val intentData = intent?.data
-        if (intentData != null) {
-            val url = intentData.toString()
-            startFloatingWebView(url)
-            finish()
-        }
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
@@ -247,7 +240,7 @@ class Simpleweb : AppCompatActivity() {
 
     private fun convertInputToUrl(input: String): String {
         val cleanInput = input.lowercase().trim()
-        val isDomain = Regex(""".\[a-z]{2,}""").containsMatchIn(cleanInput)
+        val isDomain = Regex(""".\\[a-z]{2,}""").containsMatchIn(cleanInput)
 
         return if (isDomain) {
             val cleaned = cleanInput
@@ -257,17 +250,6 @@ class Simpleweb : AppCompatActivity() {
             "https://www.$cleaned"
         } else {
             "https://www.google.com/search?q=${Uri.encode(cleanInput)}"
-        }
-    }
-
-    private fun startFloatingWebView(url: String) {
-        val intent = Intent(this, FloatingWebViewService::class.java).apply {
-            putExtra("url", url)
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
-        } else {
-            startService(intent)
         }
     }
 
