@@ -1,15 +1,16 @@
 package com.example.floatingwebview
 
 import VisitedPageAdapter
-import VisitedPageAdapter1
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.util.Patterns
+import android.view.View
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.PopupMenu
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.ViewModelProvider
@@ -19,9 +20,9 @@ import com.example.floatingwebview.databinding.ActivityMainBinding
 import com.example.floatingwebview.history.HistoryActivity
 import com.example.floatingwebview.home.HomeViewModel
 import com.example.floatingwebview.home.HomeViewModelFactory
+import com.example.floatingwebview.settings.SettingsActivity
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import java.net.URLEncoder
 
 
 class MainActivity : AppCompatActivity() {
@@ -43,11 +44,10 @@ class MainActivity : AppCompatActivity() {
         // Setup RecyclerView
         adapter = VisitedPageAdapter { page ->
 //            binding.urlEditText.setText(page.url)
-            startFloatingWebView(page.url, page.title)
+            openLink(page.url)
         }
-        binding.moreOptions.setOnClickListener {
-            val intent = Intent(this, HistoryActivity::class.java)
-            startActivity(intent)
+        binding.moreOptions.setOnClickListener { view ->
+            showMoreOptions(view)
         }
         binding.recentRecyclerView.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         binding.recentRecyclerView.adapter = adapter
@@ -86,6 +86,28 @@ class MainActivity : AppCompatActivity() {
 
     }
 
+    private fun showMoreOptions(view: View) {
+
+        val popup = PopupMenu(this, view)
+        popup.menuInflater.inflate(R.menu.main_screen_menu, popup.menu)
+        popup.setOnMenuItemClickListener { menuItem ->
+            when(menuItem.itemId) {
+                R.id.menu_history -> {
+                    val intent = Intent(this, HistoryActivity::class.java)
+                    startActivity(intent)
+                    true
+                }
+                R.id.menu_settings -> {
+                    val intent = Intent(this, SettingsActivity::class.java)
+                    startActivity(intent)
+                    true
+                }
+                else -> false
+            }
+        }
+        popup.show()
+    }
+
     private fun requestOverlayPermission() {
         val intent = Intent(
             Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -108,7 +130,7 @@ class MainActivity : AppCompatActivity() {
                     override fun onPageFinished(view: WebView?, urlStr: String?) {
                         val title = view?.title ?: ""
                         viewModel.saveVisitedPage(url, title)
-                        startFloatingWebView(url, title)
+                        openLink(url)
                     }
                 }
                 webView.loadUrl(url)
@@ -133,14 +155,25 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun startFloatingWebView(urlInput: String, title: String) {
-        val intent = Intent(this, FloatingWebViewService::class.java).apply {
-            putExtra("url", urlInput)
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
+    private fun openLink(urlInput: String) {
+
+        val sharedPreferences = getSharedPreferences("settings", Context.MODE_PRIVATE)
+        val behavior = sharedPreferences.getString("behavior", "floating")
+
+        if(behavior == "inapp") {
+            val intent = Intent(this, Simpleweb::class.java).apply {
+                putExtra("url", urlInput)
+            }
+            startActivity(intent)
         } else {
-            startService(intent)
+            val intent = Intent(this, FloatingWebViewService::class.java).apply {
+                putExtra("url", urlInput)
+            }
+            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent)
+            } else {
+                startService(intent)
+            }
         }
     }
 

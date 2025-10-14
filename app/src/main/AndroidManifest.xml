@@ -10,32 +10,39 @@
     <queries>
         <intent>
             <action android:name="android.intent.action.VIEW" />
+
             <data android:scheme="http" />
         </intent>
         <intent>
             <action android:name="android.intent.action.VIEW" />
+
             <data android:scheme="https" />
         </intent>
     </queries>
 
     <application
         android:name=".YourApplication"
-        android:hardwareAccelerated="true"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
+        android:hardwareAccelerated="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:requestLegacyExternalStorage="true"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar"
-        android:requestLegacyExternalStorage="true"
         tools:targetApi="31">
+        <activity
+            android:name=".settings.SettingsActivity"
+            android:exported="false" />
         <activity android:name=".history.HistoryActivity" />
         <activity
             android:name=".Simpleweb"
+            android:exported="true"/>
+        <activity
+            android:name=".LinkRouterActivity"
             android:exported="true">
-
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
 
@@ -57,6 +64,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
         <service
             android:name=".FloatingWebViewService"
             android:enabled="true"
@@ -65,12 +73,12 @@
 
         <activity
             android:name=".FloatingWebActivity"
-            android:theme="@style/FloatingActivityTheme"
-            android:taskAffinity=""
             android:excludeFromRecents="true"
             android:launchMode="singleTask"
-            android:windowIsTranslucent="true"
-            android:resizeableActivity="true" />
-
+            android:resizeableActivity="true"
+            android:taskAffinity=""
+            android:theme="@style/FloatingActivityTheme"
+            android:windowIsTranslucent="true" />
     </application>
+
 </manifest>
