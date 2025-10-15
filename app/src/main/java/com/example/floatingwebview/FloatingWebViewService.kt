@@ -290,6 +290,24 @@ class FloatingWebViewService : Service() {
         }
 
         webView.webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+                if (url != null) {
+                    if (url.startsWith("http://") || url.startsWith("https://")) {
+                        return false // Let the WebView handle HTTP/HTTPS URLs
+                    }
+
+                    // Handle custom schemes and intents
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        startActivity(intent)
+                        return true // The URL is handled
+                    } catch (e: Exception) {
+                        return true
+                    }
+                }
+                return false
+            }
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 val actualUrl = url ?: return
@@ -475,7 +493,7 @@ class FloatingWebViewService : Service() {
                 val text = try {
                     JSONObject("{\"v\":$allText}").getString("v")
                 } catch (e: Exception) {
-                    allText?.trim('"') ?: ""
+                    allText?.trim('\'') ?: ""
                 }
                 if (text.isNotEmpty()) {
                     val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
@@ -576,7 +594,7 @@ class FloatingWebViewService : Service() {
                     R.id.new_tab -> { showFloatingWebView(webView.url ?: "https://www.google.com", "medium"); true }
                     R.id.copy_all -> {
                         webView.evaluateJavascript("(function(){return document.body.innerText;})()") { allText ->
-                            val text = allText?.trim('"') ?: ""
+                            val text = allText?.trim('\'') ?: ""
                             if (text.isNotEmpty()) {
                                 val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
                                 clipboard.setPrimaryClip(ClipData.newPlainText("Copied Text", text))

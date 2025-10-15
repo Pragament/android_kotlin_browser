@@ -31,8 +31,12 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.floatingwebview.BrowserRepository.BrowserData
+import com.example.floatingwebview.home.AppDatabase
+import com.example.floatingwebview.home.VisitedPage
+import com.example.floatingwebview.home.VisitedPageDao
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.core.net.toUri
@@ -53,10 +57,16 @@ class Simpleweb : AppCompatActivity() {
     private var downloadUserAgent: String? = null
     private var downloadContentDisposition: String? = null
     private var downloadMimetype: String? = null
+    private var lastVisitedUrl: String? = null
+
+    private lateinit var visitedPageDao: VisitedPageDao
+    private val activityScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.simple_web_view)
+
+        visitedPageDao = AppDatabase.getInstance(applicationContext).visitedPageDao()
 
         // Initialize Views
         webView = findViewById(R.id.webView)
@@ -73,9 +83,36 @@ class Simpleweb : AppCompatActivity() {
         CookieManager.getInstance().setAcceptCookie(true)
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView,true)
         webView.webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+                if (url != null) {
+                    if (url.startsWith("http://") || url.startsWith("https://")) {
+                        return false // Let the WebView handle HTTP/HTTPS URLs
+                    }
+
+                    // Handle custom schemes and intents
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        startActivity(intent)
+                        return true // The URL is handled
+                    } catch (e: Exception) {
+                        return true
+                    }
+                }
+                return false
+            }
             override fun onPageFinished(view: WebView?, url: String?) {
+                super.onPageFinished(view, url)
                 urlEditText.setText(url ?: "")
                 updateNavigationButtons() // 👈 Auto hide/show buttons
+
+                val actualUrl = url ?: return
+                if (actualUrl == lastVisitedUrl) return
+                lastVisitedUrl = actualUrl
+
+                val title = view?.title ?: actualUrl
+                val faviconUrl = "https://www.google.com/s2/favicons?domain=${Uri.parse(actualUrl).host}&sz=64"
+                saveVisitedPage(actualUrl, title, faviconUrl)
             }
         }
 
@@ -156,6 +193,17 @@ class Simpleweb : AppCompatActivity() {
         browserPickButton.setOnClickListener {
             val currentUrl = webView.url ?: "https://www.google.com"
             showBrowserPicker(this, currentUrl)
+        }
+    }
+
+    private fun saveVisitedPage(url: String, title: String, faviconUrl: String) {
+        val page = VisitedPage(url = url, title = title, faviconUrl = faviconUrl, timestamp = System.currentTimeMillis())
+        activityScope.launch {
+            try {
+                visitedPageDao.insert(page)
+            } catch (e: Exception) {
+                Log.e("Simpleweb", "Error saving visited page", e)
+            }
         }
     }
 
@@ -240,7 +288,7 @@ class Simpleweb : AppCompatActivity() {
 
     private fun convertInputToUrl(input: String): String {
         val cleanInput = input.lowercase().trim()
-        val isDomain = Regex(""".\\[a-z]{2,}""").containsMatchIn(cleanInput)
+        val isDomain = Regex(""".\[a-z]{2,}""").containsMatchIn(cleanInput)
 
         return if (isDomain) {
             val cleaned = cleanInput
