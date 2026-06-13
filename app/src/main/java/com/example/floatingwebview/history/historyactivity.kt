@@ -1,7 +1,7 @@
 package com.example.floatingwebview.history
 
-import VisitedPageAdapter
-import VisitedPageAdapter1
+import com.example.floatingwebview.VisitedPageAdapter
+import com.example.floatingwebview.history.VisitedPageAdapter1
 import androidx.appcompat.app.AppCompatActivity
 
 import android.content.Intent

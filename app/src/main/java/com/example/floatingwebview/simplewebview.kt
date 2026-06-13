@@ -1,6 +1,5 @@
 package com.example.floatingwebview
 
-
 import android.Manifest
 import android.app.DownloadManager
 import android.content.Context
@@ -24,19 +23,29 @@ import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.ListView
+import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.example.floatingwebview.BrowserRepository.BrowserData
+import com.example.floatingwebview.history.HistoryActivity
 import com.example.floatingwebview.home.AppDatabase
+import com.example.floatingwebview.home.HomeViewModel
+import com.example.floatingwebview.home.HomeViewModelFactory
 import com.example.floatingwebview.home.VisitedPage
 import com.example.floatingwebview.home.VisitedPageDao
+import com.example.floatingwebview.settings.SettingsActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.core.net.toUri
@@ -53,6 +62,9 @@ class Simpleweb : AppCompatActivity() {
     private lateinit var homeButton: ImageButton
     private lateinit var refreshButton: ImageButton
     private lateinit var browserPickButton: ImageButton
+    private lateinit var moreOptionsButton: ImageButton
+    private lateinit var toggleHistoryButton: ImageButton
+    private lateinit var historyShortcutsRecyclerView: RecyclerView
 
     private val STORAGE_PERMISSION_CODE = 1
     private var downloadUrl: String? = null
@@ -61,8 +73,20 @@ class Simpleweb : AppCompatActivity() {
     private var downloadMimetype: String? = null
     private var lastVisitedUrl: String? = null
 
+    // AI-assisted: history shortcuts visibility state
+    private var isHistoryVisible = false
+
     private lateinit var visitedPageDao: VisitedPageDao
+    private lateinit var viewModel: HomeViewModel
+    private lateinit var historyShortcutsAdapter: VisitedPageAdapter
     private val activityScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    // Helper to read the saved homepage URL (default: google.com)
+    private fun getSavedHomepage(): String {
+        val prefs = getSharedPreferences(SettingsActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getString(SettingsActivity.KEY_HOMEPAGE, SettingsActivity.DEFAULT_HOMEPAGE)
+            ?: SettingsActivity.DEFAULT_HOMEPAGE
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,7 +94,7 @@ class Simpleweb : AppCompatActivity() {
 
         visitedPageDao = AppDatabase.getInstance(applicationContext).visitedPageDao()
 
-        // Initialize Views
+        // --- View bindings ---
         webView = findViewById(R.id.webView)
         urlEditText = findViewById(R.id.urlEditText)
         goButton = findViewById(R.id.goButton)
@@ -79,13 +103,16 @@ class Simpleweb : AppCompatActivity() {
         homeButton = findViewById(R.id.homeButton)
         refreshButton = findViewById(R.id.refreshButton)
         browserPickButton = findViewById(R.id.browserPickButton)
+        moreOptionsButton = findViewById(R.id.moreOptionsButton)
+        toggleHistoryButton = findViewById(R.id.toggleHistoryButton)
+        historyShortcutsRecyclerView = findViewById(R.id.historyShortcutsRecyclerView)
 
-        // WebView settings
+        // --- WebView settings ---
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
         webView.settings.databaseEnabled = true
         CookieManager.getInstance().setAcceptCookie(true)
-        CookieManager.getInstance().setAcceptThirdPartyCookies(webView,true)
+        CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
         webView.webChromeClient = android.webkit.WebChromeClient()
 
         // Enable WebAuthn/Passkey support
@@ -99,32 +126,29 @@ class Simpleweb : AppCompatActivity() {
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
                 if (url != null) {
-                    // Detect login/auth pages and open in Chrome Custom Tabs for passkey support
                     if (isLoginPage(url)) {
                         ChromeCustomTabHelper.openUrl(this@Simpleweb, url)
                         return true
                     }
-                    
                     if (url.startsWith("http://") || url.startsWith("https://")) {
-                        return false // Let the WebView handle HTTP/HTTPS URLs
+                        return false
                     }
-
-                    // Handle custom schemes and intents
                     try {
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
                         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         startActivity(intent)
-                        return true // The URL is handled
+                        return true
                     } catch (e: Exception) {
                         return true
                     }
                 }
                 return false
             }
+
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 urlEditText.setText(url ?: "")
-                updateNavigationButtons() // 👈 Auto hide/show buttons
+                updateNavigationButtons()
 
                 val actualUrl = url ?: return
                 if (actualUrl == lastVisitedUrl) return
@@ -141,24 +165,30 @@ class Simpleweb : AppCompatActivity() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 downloadFile(url, userAgent, contentDisposition, mimetype)
             } else {
-                if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    == PackageManager.PERMISSION_GRANTED) {
                     downloadFile(url, userAgent, contentDisposition, mimetype)
                 } else {
                     this.downloadUrl = url
                     this.downloadUserAgent = userAgent
                     this.downloadContentDisposition = contentDisposition
                     this.downloadMimetype = mimetype
-                    ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), STORAGE_PERMISSION_CODE)
+                    ActivityCompat.requestPermissions(
+                        this,
+                        arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
+                        STORAGE_PERMISSION_CODE
+                    )
                 }
             }
         }
 
-        // Load passed URL or Google by default
-        val passedUrl = intent.getStringExtra("url") ?: "https://www.google.com"
-        webView.loadUrl(passedUrl)
-        urlEditText.setText(passedUrl)
+        // --- AI-assisted: Load URL from intent OR fall back to custom homepage ---
+        val passedUrl = intent.getStringExtra("url")
+        val startUrl = passedUrl ?: getSavedHomepage()
+        webView.loadUrl(startUrl)
+        urlEditText.setText(startUrl)
 
-        // Button: Back
+        // --- Navigation Buttons ---
         backButton.setOnClickListener {
             if (webView.canGoBack()) {
                 webView.goBack()
@@ -166,7 +196,6 @@ class Simpleweb : AppCompatActivity() {
             }
         }
 
-        // Button: Forward
         forwardButton.setOnClickListener {
             if (webView.canGoForward()) {
                 webView.goForward()
@@ -174,15 +203,12 @@ class Simpleweb : AppCompatActivity() {
             }
         }
 
-        // Button: Home
+        // AI-assisted: Home button now loads the custom homepage instead of opening MainActivity
         homeButton.setOnClickListener {
-            val intent = Intent(this, MainActivity::class.java)
-            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
-            startActivity(intent)
-            finish()
+            val homepage = getSavedHomepage()
+            webView.loadUrl(homepage)
         }
 
-        // Button: Refresh
         refreshButton.setOnClickListener {
             webView.reload()
         }
@@ -195,9 +221,10 @@ class Simpleweb : AppCompatActivity() {
             homeButton.visibility = visibility
             refreshButton.visibility = visibility
             browserPickButton.visibility = visibility
+            moreOptionsButton.visibility = visibility
+            toggleHistoryButton.visibility = visibility
         }
 
-        // Button: Go
         goButton.setOnClickListener {
             val input = urlEditText.text.toString().trim()
             if (input.isNotBlank()) {
@@ -209,11 +236,77 @@ class Simpleweb : AppCompatActivity() {
             }
         }
 
-        // Button: Browser Picker
         browserPickButton.setOnClickListener {
-            val currentUrl = webView.url ?: "https://www.google.com"
+            val currentUrl = webView.url ?: getSavedHomepage()
             showBrowserPicker(this, currentUrl)
         }
+
+        // --- AI-assisted: 3-dot overflow menu → History / Settings ---
+        moreOptionsButton.setOnClickListener { view ->
+            showWebviewMoreOptions(view)
+        }
+
+        // --- AI-assisted: Toggle history shortcuts strip ---
+        toggleHistoryButton.setOnClickListener {
+            isHistoryVisible = !isHistoryVisible
+            historyShortcutsRecyclerView.visibility =
+                if (isHistoryVisible) View.VISIBLE else View.GONE
+        }
+
+        // --- Setup history shortcuts RecyclerView ---
+        setupHistoryShortcuts()
+    }
+
+    /**
+     * AI-assisted: Sets up the horizontal recent history strip below the toolbar.
+     * Reuses VisitedPageAdapter (same as MainActivity) and observes the Room DB.
+     */
+    private fun setupHistoryShortcuts() {
+        val dao = (application as YourApplication).database.visitedPageDao()
+        viewModel = ViewModelProvider(
+            this,
+            HomeViewModelFactory(dao)
+        )[HomeViewModel::class.java]
+
+        historyShortcutsAdapter = VisitedPageAdapter { page ->
+            webView.loadUrl(page.url)
+            // Hide strip after tapping a shortcut
+            isHistoryVisible = false
+            historyShortcutsRecyclerView.visibility = View.GONE
+        }
+
+        historyShortcutsRecyclerView.layoutManager =
+            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        historyShortcutsRecyclerView.adapter = historyShortcutsAdapter
+
+        lifecycleScope.launch {
+            viewModel.recentPages5.collectLatest { list ->
+                historyShortcutsAdapter.submitList(list.reversed())
+            }
+        }
+    }
+
+    /**
+     * AI-assisted: Shows a popup menu with History and Settings options on the WebView page.
+     */
+    private fun showWebviewMoreOptions(view: View) {
+        val popup = PopupMenu(this, view)
+        popup.menu.add(0, 1, 0, getString(R.string.menu_history))
+        popup.menu.add(0, 2, 1, getString(R.string.menu_settings))
+        popup.setOnMenuItemClickListener { menuItem ->
+            when (menuItem.itemId) {
+                1 -> {
+                    startActivity(Intent(this, HistoryActivity::class.java))
+                    true
+                }
+                2 -> {
+                    startActivity(Intent(this, SettingsActivity::class.java))
+                    true
+                }
+                else -> false
+            }
+        }
+        popup.show()
     }
 
     private fun saveVisitedPage(url: String, title: String, faviconUrl: String) {
@@ -232,7 +325,7 @@ class Simpleweb : AppCompatActivity() {
         if (requestCode == STORAGE_PERMISSION_CODE) {
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 Toast.makeText(this, "Permission Granted. Starting download...", Toast.LENGTH_SHORT).show()
-                if(downloadUrl != null) {
+                if (downloadUrl != null) {
                     downloadFile(downloadUrl!!, downloadUserAgent, downloadContentDisposition, downloadMimetype)
                 }
             } else {
@@ -250,7 +343,10 @@ class Simpleweb : AppCompatActivity() {
         request.setDescription("Downloading file...")
         request.setTitle(URLUtil.guessFileName(url, contentDisposition, mimetype))
         request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-        request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, URLUtil.guessFileName(url, contentDisposition, mimetype))
+        request.setDestinationInExternalPublicDir(
+            Environment.DIRECTORY_DOWNLOADS,
+            URLUtil.guessFileName(url, contentDisposition, mimetype)
+        )
         val dm = getSystemService(DOWNLOAD_SERVICE) as DownloadManager
         dm.enqueue(request)
         Toast.makeText(applicationContext, "Downloading File", Toast.LENGTH_LONG).show()
@@ -272,18 +368,14 @@ class Simpleweb : AppCompatActivity() {
                 override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
                     val view = convertView ?: LayoutInflater.from(context)
                         .inflate(R.layout.browser_item_list, parent, false)
-
                     val browser = getItem(position)
                     view.findViewById<ImageView>(R.id.browserIcon).setImageDrawable(browser?.icon)
                     view.findViewById<TextView>(R.id.browserName).text = browser?.label ?: "Unknown"
-
                     return view
                 }
             }
 
-            val listView = ListView(context).apply {
-                this.adapter = adapter
-            }
+            val listView = ListView(context).apply { this.adapter = adapter }
 
             val dialog = AlertDialog.Builder(context)
                 .setTitle("Open with...")
@@ -305,10 +397,9 @@ class Simpleweb : AppCompatActivity() {
         }
     }
 
-
     private fun convertInputToUrl(input: String): String {
         val cleanInput = input.lowercase().trim()
-        val isDomain = Regex(""".\[a-z]{2,}""").containsMatchIn(cleanInput)
+        val isDomain = Regex(""".[a-z]{2,}""").containsMatchIn(cleanInput)
 
         return if (isDomain) {
             val cleaned = cleanInput
@@ -337,27 +428,16 @@ class Simpleweb : AppCompatActivity() {
     }
 
     /**
-     * Detects if a URL is a login/authentication page that should be opened
-     * in Chrome Custom Tabs for passkey support
+     * Detects login/authentication pages to open in Chrome Custom Tabs for passkey support.
      */
     private fun isLoginPage(url: String): Boolean {
         val loginPatterns = listOf(
-            "/login",
-            "/signin",
-            "/sign-in",
-            "/sign_in",
-            "/authenticate",
-            "/auth/",
-            "/oauth",
-            "/sso/",
-            "/accounts/login",
-            "/session/new",
-            "login.php",
-            "signin.php",
-            "passkey=true"
+            "/login", "/signin", "/sign-in", "/sign_in",
+            "/authenticate", "/auth/", "/oauth", "/sso/",
+            "/accounts/login", "/session/new", "login.php",
+            "signin.php", "passkey=true"
         )
         val lowerUrl = url.lowercase()
         return loginPatterns.any { lowerUrl.contains(it) }
     }
-
 }

@@ -39,7 +39,14 @@
         <activity android:name=".history.HistoryActivity" />
         <activity
             android:name=".Simpleweb"
-            android:exported="true"/>
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.FloatingWebView">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
         <activity
             android:name=".LinkRouterActivity"
             android:exported="true">
@@ -53,17 +60,12 @@
                 <data android:scheme="https" />
             </intent-filter>
         </activity>
+        <!-- MainActivity kept for floating window support but no longer the launcher -->
         <activity
             android:name=".MainActivity"
-            android:exported="true"
+            android:exported="false"
             android:label="@string/app_name"
-            android:theme="@style/Theme.FloatingWebView">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+            android:theme="@style/Theme.FloatingWebView" />
 
         <service
             android:name=".FloatingWebViewService"

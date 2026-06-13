@@ -30,5 +30,11 @@
     <string name="menu_copy_all">Copy All</string>
     <string name="minimize">Minimize</string>
     <string name="menu_open_in_chrome">Open in Chrome (Passkey)</string>
+    <string name="menu_history">History</string>
+    <string name="menu_settings">Settings</string>
+    <string name="homepage_label">Homepage URL</string>
+    <string name="homepage_hint">https://www.google.com</string>
+    <string name="toggle_history">Toggle recent history</string>
+    <string name="more_options_webview">More options</string>
 
 </resources>
