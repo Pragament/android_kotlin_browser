@@ -36,5 +36,5 @@
     <string name="homepage_hint">https://www.google.com</string>
     <string name="toggle_history">Toggle recent history</string>
     <string name="more_options_webview">More options</string>
-
+    <string name="float_button_desc">Float this page</string>
 </resources>

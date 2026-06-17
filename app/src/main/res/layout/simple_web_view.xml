@@ -1,138 +1,184 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
+<FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/rootLayout"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:layout_height="match_parent">
 
-    <!-- ===== Toolbar ===== -->
+    <!-- ===== Main Content Container ===== -->
     <LinearLayout
-        android:id="@+id/toolbarLayout"
+        android:id="@+id/mainContentLayout"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="#2196F3"
-        android:orientation="horizontal"
-        android:padding="8dp"
-        android:gravity="center_vertical">
+        android:layout_height="match_parent"
+        android:orientation="vertical">
 
-        <!-- Back Button -->
-        <ImageButton
-            android:id="@+id/backButton"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:src="@drawable/ic_back"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/back" />
-
-        <!-- Forward Button -->
-        <ImageButton
-            android:id="@+id/forwardButton"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:src="@drawable/ic_forward"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/forward" />
-
-        <!-- Browser Picker Button -->
-        <ImageButton
-            android:id="@+id/browserPickButton"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:src="@drawable/ic_floatweb"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/more_options" />
-
-        <!-- Home Button -->
-        <ImageButton
-            android:id="@+id/homeButton"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:src="@drawable/ic_home"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/home" />
-
-        <!-- Refresh Button -->
-        <ImageButton
-            android:id="@+id/refreshButton"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:src="@drawable/ic_reload"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/refresh" />
-
-        <!-- Search Field Container -->
+        <!-- ===== Toolbar ===== -->
         <LinearLayout
-            android:id="@+id/searchContainer"
-            android:layout_width="0dp"
-            android:layout_height="38dp"
-            android:layout_weight="1"
-            android:background="@drawable/rounded_bg"
-            android:padding="4dp"
+            android:id="@+id/toolbarLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#2196F3"
             android:orientation="horizontal"
+            android:padding="8dp"
             android:gravity="center_vertical">
 
-            <EditText
-                android:id="@+id/urlEditText"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:hint="@string/search_or_url_hint"
-                android:background="@android:color/transparent"
-                android:inputType="textUri"
-                android:singleLine="true"
-                android:textSize="13sp"
-                android:imeOptions="actionGo" />
-
+            <!-- Back Button -->
             <ImageButton
-                android:id="@+id/goButton"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:id="@+id/backButton"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@drawable/ic_back"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/back" />
+
+            <!-- Forward Button -->
+            <ImageButton
+                android:id="@+id/forwardButton"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:src="@drawable/ic_forward"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/forward" />
+
+            <!-- Browser Picker Button -->
+            <ImageButton
+                android:id="@+id/browserPickButton"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@drawable/ic_floatweb"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/more_options" />
+
+            <!-- Home Button -->
+            <ImageButton
+                android:id="@+id/homeButton"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@drawable/ic_home"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/home" />
+
+            <!-- Refresh Button -->
+            <ImageButton
+                android:id="@+id/refreshButton"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@drawable/ic_reload"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/refresh" />
+
+            <!-- Search Field Container -->
+            <LinearLayout
+                android:id="@+id/searchContainer"
+                android:layout_width="0dp"
+                android:layout_height="38dp"
+                android:layout_weight="1"
                 android:background="@drawable/rounded_bg"
-                android:contentDescription="@string/go" />
+                android:padding="4dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <AutoCompleteTextView
+                    android:id="@+id/urlEditText"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:hint="@string/search_or_url_hint"
+                    android:background="@android:color/transparent"
+                    android:inputType="textUri"
+                    android:singleLine="true"
+                    android:textSize="13sp"
+                    android:completionThreshold="1"
+                    android:imeOptions="actionGo" />
+
+                <ImageButton
+                    android:id="@+id/goButton"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:src="@drawable/ic_forward"
+                    android:background="@drawable/rounded_bg"
+                    android:contentDescription="@string/go" />
+            </LinearLayout>
+
+            <!-- Toggle History Button -->
+            <ImageButton
+                android:id="@+id/toggleHistoryButton"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@android:drawable/ic_menu_recent_history"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/toggle_history"
+                android:alpha="0.85" />
+
+            <!-- 3-dot More Options Button -->
+            <ImageButton
+                android:id="@+id/moreOptionsButton"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@drawable/ic_more_vert"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/more_options_webview" />
+
         </LinearLayout>
 
-        <!-- Toggle History Button -->
-        <ImageButton
-            android:id="@+id/toggleHistoryButton"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:src="@android:drawable/ic_menu_recent_history"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/toggle_history"
-            android:alpha="0.85" />
+        <!-- ===== Recent History Shortcuts Strip ===== -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/historyShortcutsRecyclerView"
+            android:layout_width="match_parent"
+            android:layout_height="72dp"
+            android:background="#1976D2"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="4dp"
+            android:clipToPadding="false"
+            android:orientation="horizontal"
+            android:visibility="gone"
+            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
 
-        <!-- 3-dot More Options Button -->
-        <ImageButton
-            android:id="@+id/moreOptionsButton"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:src="@drawable/ic_more_vert"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/more_options_webview" />
+        <!-- ===== Progress Bar ===== -->
+        <ProgressBar
+            android:id="@+id/progressBar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:progress="0"
+            android:max="100"
+            android:visibility="gone"
+            android:indeterminate="false" />
+
+        <!-- ===== WebView Container ===== -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <WebView
+                android:id="@+id/webView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+            <!-- Float Action Button -->
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/floatButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|end"
+                android:layout_margin="16dp"
+                android:src="@drawable/ic_floatweb"
+                android:contentDescription="@string/float_button_desc"
+                app:backgroundTint="#2196F3"
+                app:tint="@android:color/white"
+                app:elevation="6dp" />
+
+        </FrameLayout>
 
     </LinearLayout>
 
-    <!-- ===== Recent History Shortcuts Strip ===== -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/historyShortcutsRecyclerView"
+    <!-- ===== Fullscreen Video/Custom View Container ===== -->
+    <FrameLayout
+        android:id="@+id/fullscreenContainer"
         android:layout_width="match_parent"
-        android:layout_height="72dp"
-        android:background="#1976D2"
-        android:paddingHorizontal="8dp"
-        android:paddingVertical="4dp"
-        android:clipToPadding="false"
-        android:orientation="horizontal"
-        android:visibility="gone"
-        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+        android:layout_height="match_parent"
+        android:background="@android:color/black"
+        android:visibility="gone" />
 
-    <!-- ===== WebView ===== -->
-    <WebView
-        android:id="@+id/webView"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
-
-</LinearLayout>
+</FrameLayout>

@@ -43,4 +43,8 @@ interface VisitedPageDao {
     LIMIT 5
 """)
     fun getRecentUniquePages5(): Flow<List<VisitedPage>>
+
+    @Query("SELECT url FROM visited_pages GROUP BY url ORDER BY MAX(timestamp) DESC")
+    fun getUniqueUrlsSortedByRecent(): Flow<List<String>>
 }
+

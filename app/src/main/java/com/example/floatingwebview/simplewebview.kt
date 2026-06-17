@@ -10,20 +10,25 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.util.Log
+import android.util.Patterns
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.webkit.CookieManager
 import android.webkit.URLUtil
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ArrayAdapter
-import android.widget.EditText
+import android.widget.AutoCompleteTextView
+import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.PopupMenu
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -51,11 +56,12 @@ import kotlinx.coroutines.withContext
 import androidx.core.net.toUri
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 
 class Simpleweb : AppCompatActivity() {
 
     private lateinit var webView: WebView
-    private lateinit var urlEditText: EditText
+    private lateinit var urlEditText: AutoCompleteTextView
     private lateinit var goButton: ImageButton
     private lateinit var backButton: ImageButton
     private lateinit var forwardButton: ImageButton
@@ -65,6 +71,10 @@ class Simpleweb : AppCompatActivity() {
     private lateinit var moreOptionsButton: ImageButton
     private lateinit var toggleHistoryButton: ImageButton
     private lateinit var historyShortcutsRecyclerView: RecyclerView
+    private lateinit var progressBar: ProgressBar
+    private lateinit var floatButton: FloatingActionButton
+    private lateinit var fullscreenContainer: FrameLayout
+    private lateinit var mainContentLayout: LinearLayout
 
     private val STORAGE_PERMISSION_CODE = 1
     private var downloadUrl: String? = null
@@ -72,6 +82,10 @@ class Simpleweb : AppCompatActivity() {
     private var downloadContentDisposition: String? = null
     private var downloadMimetype: String? = null
     private var lastVisitedUrl: String? = null
+
+    // For Fullscreen Video support
+    private var customView: View? = null
+    private var customViewCallback: android.webkit.WebChromeClient.CustomViewCallback? = null
 
     // AI-assisted: history shortcuts visibility state
     private var isHistoryVisible = false
@@ -86,6 +100,16 @@ class Simpleweb : AppCompatActivity() {
         val prefs = getSharedPreferences(SettingsActivity.PREFS_NAME, Context.MODE_PRIVATE)
         return prefs.getString(SettingsActivity.KEY_HOMEPAGE, SettingsActivity.DEFAULT_HOMEPAGE)
             ?: SettingsActivity.DEFAULT_HOMEPAGE
+    }
+
+    private fun getJavaScriptEnabled(): Boolean {
+        val prefs = getSharedPreferences(SettingsActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getBoolean("inapp_js_enabled", true)
+    }
+
+    private fun setJavaScriptEnabled(enabled: Boolean) {
+        val prefs = getSharedPreferences(SettingsActivity.PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("inapp_js_enabled", enabled).apply()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -106,14 +130,17 @@ class Simpleweb : AppCompatActivity() {
         moreOptionsButton = findViewById(R.id.moreOptionsButton)
         toggleHistoryButton = findViewById(R.id.toggleHistoryButton)
         historyShortcutsRecyclerView = findViewById(R.id.historyShortcutsRecyclerView)
+        progressBar = findViewById(R.id.progressBar)
+        floatButton = findViewById(R.id.floatButton)
+        fullscreenContainer = findViewById(R.id.fullscreenContainer)
+        mainContentLayout = findViewById(R.id.mainContentLayout)
 
         // --- WebView settings ---
-        webView.settings.javaScriptEnabled = true
+        webView.settings.javaScriptEnabled = getJavaScriptEnabled()
         webView.settings.domStorageEnabled = true
         webView.settings.databaseEnabled = true
         CookieManager.getInstance().setAcceptCookie(true)
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
-        webView.webChromeClient = android.webkit.WebChromeClient()
 
         // Enable WebAuthn/Passkey support
         if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_AUTHENTICATION)) {
@@ -121,6 +148,49 @@ class Simpleweb : AppCompatActivity() {
                 webView.settings,
                 WebSettingsCompat.WEB_AUTHENTICATION_SUPPORT_FOR_APP
             )
+        }
+
+        webView.webChromeClient = object : android.webkit.WebChromeClient() {
+            override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                super.onProgressChanged(view, newProgress)
+                if (newProgress < 100) {
+                    progressBar.visibility = View.VISIBLE
+                    progressBar.progress = newProgress
+                } else {
+                    progressBar.visibility = View.GONE
+                }
+            }
+
+            override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
+                super.onShowCustomView(view, callback)
+                if (customView != null) {
+                    callback?.onCustomViewHidden()
+                    return
+                }
+                customView = view
+                customViewCallback = callback
+
+                mainContentLayout.visibility = View.GONE
+                fullscreenContainer.visibility = View.VISIBLE
+                fullscreenContainer.addView(view)
+
+                setFullscreen(true)
+            }
+
+            override fun onHideCustomView() {
+                super.onHideCustomView()
+                if (customView == null) return
+
+                fullscreenContainer.removeView(customView)
+                fullscreenContainer.visibility = View.GONE
+
+                customView = null
+                customViewCallback = null
+
+                mainContentLayout.visibility = View.VISIBLE
+
+                setFullscreen(false)
+            }
         }
 
         webView.webViewClient = object : WebViewClient() {
@@ -225,6 +295,37 @@ class Simpleweb : AppCompatActivity() {
             toggleHistoryButton.visibility = visibility
         }
 
+        // Handle Auto-Complete history suggestions
+        val autocompleteUrls = mutableListOf<String>()
+        val autocompleteAdapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, autocompleteUrls)
+        urlEditText.setAdapter(autocompleteAdapter)
+
+        lifecycleScope.launch {
+            visitedPageDao.getUniqueUrlsSortedByRecent().collectLatest { list ->
+                autocompleteUrls.clear()
+                autocompleteUrls.addAll(list)
+                autocompleteAdapter.notifyDataSetChanged()
+            }
+        }
+
+        urlEditText.setOnItemClickListener { parent, _, position, _ ->
+            val selectedUrl = parent.getItemAtPosition(position) as String
+            urlEditText.setText(selectedUrl)
+            urlEditText.clearFocus()
+            hideKeyboard()
+            webView.loadUrl(selectedUrl)
+        }
+
+        // Soft keyboard GO/Enter action listener
+        urlEditText.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_GO) {
+                goButton.performClick()
+                true
+            } else {
+                false
+            }
+        }
+
         goButton.setOnClickListener {
             val input = urlEditText.text.toString().trim()
             if (input.isNotBlank()) {
@@ -241,9 +342,15 @@ class Simpleweb : AppCompatActivity() {
             showBrowserPicker(this, currentUrl)
         }
 
-        // --- AI-assisted: 3-dot overflow menu → History / Settings ---
+        // --- AI-assisted: 3-dot overflow menu → History / Settings / JS toggle ---
         moreOptionsButton.setOnClickListener { view ->
             showWebviewMoreOptions(view)
+        }
+
+        // --- Float FAB click listener ---
+        floatButton.setOnClickListener {
+            val currentUrl = webView.url ?: getSavedHomepage()
+            startFloatingWindow(currentUrl)
         }
 
         // --- AI-assisted: Toggle history shortcuts strip ---
@@ -287,12 +394,16 @@ class Simpleweb : AppCompatActivity() {
     }
 
     /**
-     * AI-assisted: Shows a popup menu with History and Settings options on the WebView page.
+     * AI-assisted: Shows a popup menu with History, Settings, and JS Toggle options on the WebView page.
      */
     private fun showWebviewMoreOptions(view: View) {
         val popup = PopupMenu(this, view)
         popup.menu.add(0, 1, 0, getString(R.string.menu_history))
         popup.menu.add(0, 2, 1, getString(R.string.menu_settings))
+
+        val isJsEnabled = webView.settings.javaScriptEnabled
+        popup.menu.add(0, 3, 2, "JavaScript: ${if (isJsEnabled) "ON" else "OFF"}")
+
         popup.setOnMenuItemClickListener { menuItem ->
             when (menuItem.itemId) {
                 1 -> {
@@ -303,10 +414,71 @@ class Simpleweb : AppCompatActivity() {
                     startActivity(Intent(this, SettingsActivity::class.java))
                     true
                 }
+                3 -> {
+                    val isEnabled = !webView.settings.javaScriptEnabled
+                    webView.settings.javaScriptEnabled = isEnabled
+                    setJavaScriptEnabled(isEnabled)
+                    webView.reload()
+                    Toast.makeText(
+                        this,
+                        if (isEnabled) "JavaScript Enabled" else "JavaScript Disabled",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    true
+                }
                 else -> false
             }
         }
         popup.show()
+    }
+
+    private fun startFloatingWindow(url: String) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !android.provider.Settings.canDrawOverlays(this)) {
+            val intent = Intent(
+                android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:$packageName")
+            )
+            startActivity(intent)
+            Toast.makeText(this, "Please grant Overlay Permission to float the browser.", Toast.LENGTH_LONG).show()
+        } else {
+            val intent = Intent(this, FloatingWebViewService::class.java).apply {
+                putExtra("url", url)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent)
+            } else {
+                startService(intent)
+            }
+            finish()
+        }
+    }
+
+    private fun setFullscreen(enable: Boolean) {
+        if (enable) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                window.insetsController?.hide(
+                    android.view.WindowInsets.Type.statusBars() or
+                    android.view.WindowInsets.Type.navigationBars()
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                window.decorView.systemUiVisibility = (
+                    View.SYSTEM_UI_FLAG_FULLSCREEN or
+                    View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                )
+            }
+        } else {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                window.insetsController?.show(
+                    android.view.WindowInsets.Type.statusBars() or
+                    android.view.WindowInsets.Type.navigationBars()
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
+            }
+        }
     }
 
     private fun saveVisitedPage(url: String, title: String, faviconUrl: String) {
@@ -398,18 +570,20 @@ class Simpleweb : AppCompatActivity() {
     }
 
     private fun convertInputToUrl(input: String): String {
-        val cleanInput = input.lowercase().trim()
-        val isDomain = Regex(""".[a-z]{2,}""").containsMatchIn(cleanInput)
+        val cleanInput = input.trim()
+        if (cleanInput.isEmpty()) return ""
 
-        return if (isDomain) {
-            val cleaned = cleanInput
-                .removePrefix("https://")
-                .removePrefix("http://")
-                .removePrefix("www.")
-            "https://www.$cleaned"
-        } else {
-            "https://www.google.com/search?q=${Uri.encode(cleanInput)}"
+        if (cleanInput.startsWith("http://", ignoreCase = true) ||
+            cleanInput.startsWith("https://", ignoreCase = true)) {
+            return cleanInput
         }
+
+        val matcher = Patterns.WEB_URL.matcher(cleanInput)
+        if (matcher.matches()) {
+            return "https://$cleanInput"
+        }
+
+        return "https://www.google.com/search?q=${Uri.encode(cleanInput)}"
     }
 
     private fun hideKeyboard() {
